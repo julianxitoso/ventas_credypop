@@ -30,6 +30,22 @@ test('the panel shows todays indicators', function () {
         );
 });
 
+test('the panel reports the latest sale and correction so it can announce new work', function () {
+    Venta::factory()->create();
+    $ultima = Venta::factory()->create([
+        'estado' => EstadoVenta::Pendiente,
+        'corregida_en' => '2026-09-30 10:15:00',
+    ]);
+
+    $this->actingAs($this->facturador)
+        ->get(route('panel', ['pestana' => 'historial', 'buscar' => 'no-coincide']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('ventas.data', 0)
+            ->where('ultimaVentaId', $ultima->id)
+            ->where('ultimaCorreccion', '2026-09-30 10:15:00'),
+        );
+});
+
 test('the pending tab only lists pending sales, newest first', function () {
     $antigua = Venta::factory()->create();
     $reciente = Venta::factory()->create();

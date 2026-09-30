@@ -29,7 +29,9 @@ class PanelController extends Controller
     ];
 
     /**
-     * Panel del facturador y del gerente: indicadores y listado de ventas.
+     * Panel del facturador y del administrador: indicadores y listado de ventas.
+     * La página se actualiza sola cada 30 segundos; "ultimaVentaId" y
+     * "ultimaCorreccion" le permiten avisar cuando llega trabajo nuevo.
      */
     public function index(Request $request): Response
     {
@@ -42,6 +44,8 @@ class PanelController extends Controller
                 $this->consulta($filtros)->paginate(self::VENTAS_POR_PAGINA)->withQueryString(),
             ),
             'puedeFacturar' => $request->user()->can('facturar'),
+            'ultimaVentaId' => (int) Venta::query()->max('id'),
+            'ultimaCorreccion' => Venta::query()->max('corregida_en'),
         ]);
     }
 

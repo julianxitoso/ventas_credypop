@@ -1,7 +1,8 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePoll } from '@inertiajs/react';
 import { Download, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 import DetalleVentaDialog from '@/components/detalle-venta-dialog';
 import EstadoVentaBadge from '@/components/estado-venta-badge';
 import { Button } from '@/components/ui/button';
@@ -30,9 +31,13 @@ type Props = {
     indicadores: IndicadoresPanel;
     ventas: Paginado<VentaPanel>;
     puedeFacturar: boolean;
+    ultimaVentaId: number;
+    ultimaCorreccion: string | null;
 };
 
 const TODOS = 'todos';
+
+const INTERVALO_ACTUALIZACION = 30_000;
 
 /**
  * Deja solo los filtros con valor para no ensuciar la URL.
@@ -48,9 +53,47 @@ export default function Panel({
     indicadores,
     ventas,
     puedeFacturar,
+    ultimaVentaId,
+    ultimaCorreccion,
 }: Props) {
     const [busqueda, setBusqueda] = useState(filtros.buscar);
     const [seleccionada, setSeleccionada] = useState<VentaPanel | null>(null);
+    const vistoAntes = useRef({ ultimaVentaId, ultimaCorreccion });
+
+    usePoll(
+        INTERVALO_ACTUALIZACION,
+        {
+            only: [
+                'ventas',
+                'indicadores',
+                'ultimaVentaId',
+                'ultimaCorreccion',
+            ],
+            showProgress: false,
+        },
+        { keepAlive: true },
+    );
+
+    useEffect(() => {
+        const nuevas = ultimaVentaId - vistoAntes.current.ultimaVentaId;
+
+        if (nuevas > 0) {
+            toast.info(
+                nuevas === 1
+                    ? 'Llegó 1 venta nueva'
+                    : `Llegaron ${nuevas} ventas nuevas`,
+            );
+        }
+
+        if (
+            ultimaCorreccion !== null &&
+            ultimaCorreccion !== vistoAntes.current.ultimaCorreccion
+        ) {
+            toast.info('Una venta corregida volvió a pendientes');
+        }
+
+        vistoAntes.current = { ultimaVentaId, ultimaCorreccion };
+    }, [ultimaVentaId, ultimaCorreccion]);
 
     function aplicarFiltros(cambios: Partial<FiltrosPanel>) {
         router.get(panel.url(), consultaDe({ ...filtros, ...cambios }), {
@@ -75,7 +118,13 @@ export default function Panel({
 
     return (
         <>
-            <Head title="Panel de ventas" />
+            <Head
+                title={
+                    indicadores.pendientes > 0
+                        ? `(${indicadores.pendientes}) Panel de ventas`
+                        : 'Panel de ventas'
+                }
+            />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
