@@ -46,6 +46,26 @@ test('the panel reports the latest sale and correction so it can announce new wo
         );
 });
 
+test('the periodic refresh brings sales registered after the panel was opened', function () {
+    $antes = Venta::factory()->create();
+
+    $response = $this->actingAs($this->facturador)->get(route('panel'));
+
+    $nueva = Venta::factory()->create();
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('ultimaVentaId', $antes->id)
+        ->reloadOnly(
+            ['ventas', 'indicadores', 'ultimaVentaId', 'ultimaCorreccion'],
+            fn (Assert $recarga) => $recarga
+                ->where('ultimaVentaId', $nueva->id)
+                ->where('indicadores.pendientes', 2)
+                ->where('ventas.data.0.id', $nueva->id)
+                ->missing('filtros'),
+        ),
+    );
+});
+
 test('the pending tab only lists pending sales, newest first', function () {
     $antigua = Venta::factory()->create();
     $reciente = Venta::factory()->create();

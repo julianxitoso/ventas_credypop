@@ -59,6 +59,7 @@ export default function Panel({
     const [busqueda, setBusqueda] = useState(filtros.buscar);
     const [seleccionada, setSeleccionada] = useState<VentaPanel | null>(null);
     const vistoAntes = useRef({ ultimaVentaId, ultimaCorreccion });
+    const nuevasSinVer = useRef(0);
 
     usePoll(
         INTERVALO_ACTUALIZACION,
@@ -77,11 +78,23 @@ export default function Panel({
     useEffect(() => {
         const nuevas = ultimaVentaId - vistoAntes.current.ultimaVentaId;
 
+        // Los avisos quedan en pantalla hasta que el facturador los cierre,
+        // y uno abierto se actualiza en vez de apilar avisos nuevos.
         if (nuevas > 0) {
+            nuevasSinVer.current += nuevas;
+
             toast.info(
-                nuevas === 1
+                nuevasSinVer.current === 1
                     ? 'Llegó 1 venta nueva'
-                    : `Llegaron ${nuevas} ventas nuevas`,
+                    : `Llegaron ${nuevasSinVer.current} ventas nuevas`,
+                {
+                    id: 'ventas-nuevas',
+                    duration: Infinity,
+                    closeButton: true,
+                    onDismiss: () => {
+                        nuevasSinVer.current = 0;
+                    },
+                },
             );
         }
 
@@ -89,7 +102,11 @@ export default function Panel({
             ultimaCorreccion !== null &&
             ultimaCorreccion !== vistoAntes.current.ultimaCorreccion
         ) {
-            toast.info('Una venta corregida volvió a pendientes');
+            toast.info('Una venta corregida volvió a pendientes', {
+                id: 'venta-corregida',
+                duration: Infinity,
+                closeButton: true,
+            });
         }
 
         vistoAntes.current = { ultimaVentaId, ultimaCorreccion };

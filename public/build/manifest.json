@@ -24,8 +24,8 @@
       "_createLucideIcon-CXEjppjG.js"
     ]
   },
-  "_checkbox-CWuyTTw8.js": {
-    "file": "assets/checkbox-CWuyTTw8.js",
+  "_checkbox-Cr5qbLn9.js": {
+    "file": "assets/checkbox-Cr5qbLn9.js",
     "name": "checkbox",
     "imports": [
       "_rolldown-runtime-hePW80VL.js",
@@ -45,8 +45,8 @@
       "_wayfinder-DLDWVlNq.js"
     ]
   },
-  "_dialog-q_kW3d-O.js": {
-    "file": "assets/dialog-q_kW3d-O.js",
+  "_dialog-BrBUkb9z.js": {
+    "file": "assets/dialog-BrBUkb9z.js",
     "name": "dialog",
     "imports": [
       "_rolldown-runtime-hePW80VL.js",
@@ -98,14 +98,14 @@
     "file": "assets/formato-VE-pAaw9.js",
     "name": "formato"
   },
-  "_formulario-venta-D36HUDD7.js": {
-    "file": "assets/formulario-venta-D36HUDD7.js",
+  "_formulario-venta-abPO5YUw.js": {
+    "file": "assets/formulario-venta-abPO5YUw.js",
     "name": "formulario-venta",
     "imports": [
       "_wayfinder-DLDWVlNq.js",
       "_input-DnPiFi06.js",
       "_createLucideIcon-CXEjppjG.js",
-      "_select-BmHlTP9y.js",
+      "_select-BY_t4jWJ.js",
       "_spinner-Cw9gBl86.js",
       "_input-error-FBUA5t16.js",
       "_label-ChllpkSZ.js",
@@ -191,8 +191,8 @@
     "file": "assets/rolldown-runtime-hePW80VL.js",
     "name": "rolldown-runtime"
   },
-  "_select-BmHlTP9y.js": {
-    "file": "assets/select-BmHlTP9y.js",
+  "_select-BY_t4jWJ.js": {
+    "file": "assets/select-BY_t4jWJ.js",
     "name": "select",
     "imports": [
       "_rolldown-runtime-hePW80VL.js",
@@ -240,7 +240,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-CKHdthW7.js",
+    "file": "assets/app-CWaDf1HX.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,
@@ -269,7 +269,7 @@
     ]
   },
   "resources/js/pages/admin/convenios.tsx": {
-    "file": "assets/convenios-MFfqC2IO.js",
+    "file": "assets/convenios-9yn5L3o3.js",
     "name": "convenios",
     "src": "resources/js/pages/admin/convenios.tsx",
     "isDynamicEntry": true,
@@ -281,12 +281,12 @@
       "resources/js/app.tsx",
       "_input-error-FBUA5t16.js",
       "_badge-CWqzQoNC.js",
-      "_checkbox-CWuyTTw8.js",
+      "_checkbox-Cr5qbLn9.js",
       "_label-ChllpkSZ.js"
     ]
   },
   "resources/js/pages/admin/usuarios.tsx": {
-    "file": "assets/usuarios-78cMe-Fu.js",
+    "file": "assets/usuarios-DmJ01Buc.js",
     "name": "usuarios",
     "src": "resources/js/pages/admin/usuarios.tsx",
     "isDynamicEntry": true,
@@ -295,14 +295,14 @@
       "_wayfinder-DLDWVlNq.js",
       "_input-DnPiFi06.js",
       "_createLucideIcon-CXEjppjG.js",
-      "_select-BmHlTP9y.js",
+      "_select-BY_t4jWJ.js",
       "_password-input-D1j7CUJG.js",
       "_spinner-Cw9gBl86.js",
       "resources/js/app.tsx",
       "_input-error-FBUA5t16.js",
       "_badge-CWqzQoNC.js",
       "_label-ChllpkSZ.js",
-      "_dialog-q_kW3d-O.js"
+      "_dialog-BrBUkb9z.js"
     ]
   },
   "resources/js/pages/auth/confirm-password.tsx": {
@@ -320,7 +320,7 @@
     ]
   },
   "resources/js/pages/auth/login.tsx": {
-    "file": "assets/login-GTrFLcoP.js",
+    "file": "assets/login-CuRScRJ2.js",
     "name": "login",
     "src": "resources/js/pages/auth/login.tsx",
     "isDynamicEntry": true,
@@ -330,7 +330,7 @@
       "_password-input-D1j7CUJG.js",
       "_spinner-Cw9gBl86.js",
       "_input-error-FBUA5t16.js",
-      "_checkbox-CWuyTTw8.js",
+      "_checkbox-Cr5qbLn9.js",
       "_label-ChllpkSZ.js"
     ]
   },
@@ -348,7 +348,7 @@
     ]
   },
   "resources/js/pages/panel/index.tsx": {
-    "file": "assets/panel-DfjMdEjM.js",
+    "file": "assets/panel-uwFRFHPp.js",
     "name": "panel",
     "src": "resources/js/pages/panel/index.tsx",
     "isDynamicEntry": true,
@@ -357,18 +357,18 @@
       "_wayfinder-DLDWVlNq.js",
       "_input-DnPiFi06.js",
       "_createLucideIcon-CXEjppjG.js",
-      "_select-BmHlTP9y.js",
+      "_select-BY_t4jWJ.js",
       "_spinner-Cw9gBl86.js",
       "resources/js/app.tsx",
       "_input-error-FBUA5t16.js",
       "_label-ChllpkSZ.js",
-      "_dialog-q_kW3d-O.js",
+      "_dialog-BrBUkb9z.js",
       "_estado-venta-badge-BcLXfQHM.js",
       "_formato-VE-pAaw9.js"
     ]
   },
   "resources/js/pages/resumen/index.tsx": {
-    "file": "assets/resumen-D-mhQ3TT.js",
+    "file": "assets/resumen-C7rHlGgi.js",
     "name": "resumen",
     "src": "resources/js/pages/resumen/index.tsx",
     "isDynamicEntry": true,
@@ -380,7 +380,7 @@
     ]
   },
   "resources/js/pages/settings/appearance.tsx": {
-    "file": "assets/appearance-DZdGg90B.js",
+    "file": "assets/appearance-DWlksIdu.js",
     "name": "appearance",
     "src": "resources/js/pages/settings/appearance.tsx",
     "isDynamicEntry": true,
@@ -391,7 +391,7 @@
     ]
   },
   "resources/js/pages/settings/profile.tsx": {
-    "file": "assets/profile-CroE354q.js",
+    "file": "assets/profile-kLsXSgwT.js",
     "name": "profile",
     "src": "resources/js/pages/settings/profile.tsx",
     "isDynamicEntry": true,
@@ -404,7 +404,7 @@
     ]
   },
   "resources/js/pages/settings/security.tsx": {
-    "file": "assets/security-BUuNMjR3.js",
+    "file": "assets/security-DKbOwTY-.js",
     "name": "security",
     "src": "resources/js/pages/settings/security.tsx",
     "isDynamicEntry": true,
@@ -420,25 +420,25 @@
       "resources/js/app.tsx",
       "_input-error-FBUA5t16.js",
       "_label-ChllpkSZ.js",
-      "_dialog-q_kW3d-O.js",
+      "_dialog-BrBUkb9z.js",
       "_card-B_hlJKPr.js"
     ]
   },
   "resources/js/pages/ventas/corregir.tsx": {
-    "file": "assets/corregir-DL7xoB7H.js",
+    "file": "assets/corregir-CZCH8ovs.js",
     "name": "corregir",
     "src": "resources/js/pages/ventas/corregir.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_wayfinder-DLDWVlNq.js",
       "_createLucideIcon-CXEjppjG.js",
-      "_formulario-venta-D36HUDD7.js",
+      "_formulario-venta-abPO5YUw.js",
       "resources/js/app.tsx",
       "_card-B_hlJKPr.js"
     ]
   },
   "resources/js/pages/ventas/registrar.tsx": {
-    "file": "assets/registrar-C02Bm9uv.js",
+    "file": "assets/registrar-NLSSXVWm.js",
     "name": "registrar",
     "src": "resources/js/pages/ventas/registrar.tsx",
     "isDynamicEntry": true,
@@ -448,11 +448,11 @@
       "_input-DnPiFi06.js",
       "_createLucideIcon-CXEjppjG.js",
       "_spinner-Cw9gBl86.js",
-      "_formulario-venta-D36HUDD7.js",
+      "_formulario-venta-abPO5YUw.js",
       "resources/js/app.tsx",
       "_input-error-FBUA5t16.js",
       "_label-ChllpkSZ.js",
-      "_dialog-q_kW3d-O.js",
+      "_dialog-BrBUkb9z.js",
       "_estado-venta-badge-BcLXfQHM.js",
       "_formato-VE-pAaw9.js",
       "_card-B_hlJKPr.js"
