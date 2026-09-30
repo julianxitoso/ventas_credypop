@@ -1,0 +1,163 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --font-sans:
+        'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    /* Colores de la marca CREDYPOP (tomados del logo) */
+    --color-marca-indigo: var(--marca-indigo);
+    --color-marca-naranja: var(--marca-naranja);
+}
+
+/*
+ * Tema CREDYPOP: índigo como color principal, naranja solo como acento de marca.
+ * Los colores de estado (pendiente, facturada, devuelta, caída) no dependen del tema.
+ */
+:root {
+    --marca-indigo: #2b3086;
+    --marca-naranja: #eb4f1a;
+
+    --background: #fbfbfe;
+    --foreground: #14162e;
+    --card: #ffffff;
+    --card-foreground: #14162e;
+    --popover: #ffffff;
+    --popover-foreground: #14162e;
+    --primary: #2b3086;
+    --primary-foreground: #ffffff;
+    --secondary: #eeeff8;
+    --secondary-foreground: #2b3086;
+    --muted: #f1f2f8;
+    --muted-foreground: #5f627c;
+    --accent: #eeeffa;
+    --accent-foreground: #1f2366;
+    --destructive: #dc2626;
+    --destructive-foreground: #dc2626;
+    --border: #e5e7f0;
+    --input: #dcdfea;
+    --ring: #2b3086;
+    --chart-1: #2b3086;
+    --chart-2: #eb4f1a;
+    --chart-3: #7c80d6;
+    --chart-4: #f59e6b;
+    --chart-5: #5f627c;
+    --radius: 0.75rem;
+    --sidebar: #f4f5fa;
+    --sidebar-foreground: #3a3d5c;
+    --sidebar-primary: #2b3086;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e7e8f6;
+    --sidebar-accent-foreground: #2b3086;
+    --sidebar-border: #e5e7f0;
+    --sidebar-ring: #2b3086;
+}
+
+.dark {
+    --marca-indigo: #8d92f2;
+    --marca-naranja: #ff6a33;
+
+    --background: #0e1024;
+    --foreground: #ecedf7;
+    --card: #151836;
+    --card-foreground: #ecedf7;
+    --popover: #151836;
+    --popover-foreground: #ecedf7;
+    --primary: #8d92f2;
+    --primary-foreground: #0e1024;
+    --secondary: #1f2347;
+    --secondary-foreground: #ecedf7;
+    --muted: #1b1e3d;
+    --muted-foreground: #9a9dbd;
+    --accent: #22264e;
+    --accent-foreground: #ecedf7;
+    --destructive: oklch(0.396 0.141 25.723);
+    --destructive-foreground: oklch(0.637 0.237 25.331);
+    --border: #262a52;
+    --input: #2c305c;
+    --ring: #8d92f2;
+    --chart-1: #8d92f2;
+    --chart-2: #ff6a33;
+    --chart-3: #c3c6f8;
+    --chart-4: #ffa27c;
+    --chart-5: #9a9dbd;
+    --sidebar: #0b0d1e;
+    --sidebar-foreground: #c7c9e3;
+    --sidebar-primary: #8d92f2;
+    --sidebar-primary-foreground: #0e1024;
+    --sidebar-accent: #1d2146;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #1d2146;
+    --sidebar-ring: #8d92f2;
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+
+    h1,
+    h2,
+    h3 {
+        @apply tracking-tight;
+    }
+}

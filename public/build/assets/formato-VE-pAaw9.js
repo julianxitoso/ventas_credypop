@@ -1,0 +1,1 @@
+var e=new Intl.NumberFormat(`es-CO`,{maximumFractionDigits:0}),t=new Intl.NumberFormat(`es-CO`,{notation:`compact`,maximumFractionDigits:1});function n(t){return`$${e.format(t)}`}function r(e){return`$${t.format(e)}`}export{r as n,n as t};
