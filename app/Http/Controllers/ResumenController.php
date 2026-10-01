@@ -13,8 +13,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Dashboard del gerente y del administrador. El "valor vendido"
- * no incluye las ventas caídas porque no se concretaron.
+ * Dashboard del gerente y del administrador. El "valor vendido" y la
+ * "cuota inicial" no incluyen las ventas caídas porque no se concretaron.
  */
 class ResumenController extends Controller
 {
@@ -78,21 +78,24 @@ class ResumenController extends Controller
     {
         $porEstado = $this->ventasDelPeriodo($desde, $hasta)
             ->selectRaw('estado, count(*) as cantidad, coalesce(sum(valor_venta), 0) as valor')
+            ->selectRaw('coalesce(sum(valor_inicial), 0) as inicial')
+            ->selectRaw('sum(case when valor_inicial > 0 then 1 else 0 end) as con_inicial')
             ->groupBy('estado')
             ->get()
             ->keyBy('estado');
 
-        $cantidad = fn (EstadoVenta $estado): int => (int) ($porEstado->get($estado->value)->cantidad ?? 0);
-        $valor = fn (EstadoVenta $estado): int => (int) ($porEstado->get($estado->value)->valor ?? 0);
+        $dato = fn (EstadoVenta $estado, string $campo): int => (int) ($porEstado->get($estado->value)->{$campo} ?? 0);
 
         return [
             'registradas' => (int) $porEstado->sum('cantidad'),
-            'valorVendido' => (int) $porEstado->sum('valor') - $valor(EstadoVenta::Caida),
-            'facturadas' => $cantidad(EstadoVenta::Facturada),
-            'valorFacturado' => $valor(EstadoVenta::Facturada),
-            'pendientes' => $cantidad(EstadoVenta::Pendiente),
-            'devueltas' => $cantidad(EstadoVenta::Devuelta),
-            'caidas' => $cantidad(EstadoVenta::Caida),
+            'valorVendido' => (int) $porEstado->sum('valor') - $dato(EstadoVenta::Caida, 'valor'),
+            'cuotaInicial' => (int) $porEstado->sum('inicial') - $dato(EstadoVenta::Caida, 'inicial'),
+            'ventasConInicial' => (int) $porEstado->sum('con_inicial') - $dato(EstadoVenta::Caida, 'con_inicial'),
+            'facturadas' => $dato(EstadoVenta::Facturada, 'cantidad'),
+            'valorFacturado' => $dato(EstadoVenta::Facturada, 'valor'),
+            'pendientes' => $dato(EstadoVenta::Pendiente, 'cantidad'),
+            'devueltas' => $dato(EstadoVenta::Devuelta, 'cantidad'),
+            'caidas' => $dato(EstadoVenta::Caida, 'cantidad'),
         ];
     }
 
@@ -128,7 +131,7 @@ class ResumenController extends Controller
     }
 
     /**
-     * @return list<array{id: int, nombre: string, usuario: string, ventas: int, valor: int, facturadas: int, devueltas: int, caidas: int}>
+     * @return list<array{id: int, nombre: string, usuario: string, ventas: int, valor: int, inicial: int, facturadas: int, devueltas: int, caidas: int}>
      */
     private function porAsesor(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
@@ -137,6 +140,7 @@ class ResumenController extends Controller
             ->select('users.id', 'users.name', 'users.usuario')
             ->selectRaw('count(*) as ventas')
             ->selectRaw('sum(case when ventas.estado != ? then ventas.valor_venta else 0 end) as valor', [EstadoVenta::Caida->value])
+            ->selectRaw('sum(case when ventas.estado != ? then ventas.valor_inicial else 0 end) as inicial', [EstadoVenta::Caida->value])
             ->selectRaw('sum(case when ventas.estado = ? then 1 else 0 end) as facturadas', [EstadoVenta::Facturada->value])
             ->selectRaw('sum(case when ventas.estado = ? then 1 else 0 end) as devueltas', [EstadoVenta::Devuelta->value])
             ->selectRaw('sum(case when ventas.estado = ? then 1 else 0 end) as caidas', [EstadoVenta::Caida->value])
@@ -149,6 +153,7 @@ class ResumenController extends Controller
                 'usuario' => (string) $fila->usuario,
                 'ventas' => (int) $fila->ventas,
                 'valor' => (int) $fila->valor,
+                'inicial' => (int) $fila->inicial,
                 'facturadas' => (int) $fila->facturadas,
                 'devueltas' => (int) $fila->devueltas,
                 'caidas' => (int) $fila->caidas,
@@ -157,7 +162,7 @@ class ResumenController extends Controller
     }
 
     /**
-     * @return list<array{nombre: string, ventas: int, valor: int}>
+     * @return list<array{nombre: string, ventas: int, valor: int, inicial: int}>
      */
     private function porConvenio(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
@@ -165,7 +170,7 @@ class ResumenController extends Controller
             ->join('convenios', 'convenios.id', '=', 'ventas.convenio_id')
             ->where('ventas.estado', '!=', EstadoVenta::Caida->value)
             ->select('convenios.nombre')
-            ->selectRaw('count(*) as ventas, sum(ventas.valor_venta) as valor')
+            ->selectRaw('count(*) as ventas, sum(ventas.valor_venta) as valor, sum(ventas.valor_inicial) as inicial')
             ->groupBy('convenios.id', 'convenios.nombre')
             ->orderByDesc('valor')
             ->get()
@@ -173,6 +178,7 @@ class ResumenController extends Controller
                 'nombre' => (string) $fila->nombre,
                 'ventas' => (int) $fila->ventas,
                 'valor' => (int) $fila->valor,
+                'inicial' => (int) $fila->inicial,
             ])
             ->all());
     }

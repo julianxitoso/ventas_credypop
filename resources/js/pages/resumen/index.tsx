@@ -17,6 +17,8 @@ import { resumen } from '@/routes';
 type Indicadores = {
     registradas: number;
     valorVendido: number;
+    cuotaInicial: number;
+    ventasConInicial: number;
     facturadas: number;
     valorFacturado: number;
     pendientes: number;
@@ -32,12 +34,18 @@ type FilaAsesor = {
     usuario: string;
     ventas: number;
     valor: number;
+    inicial: number;
     facturadas: number;
     devueltas: number;
     caidas: number;
 };
 
-type FilaConvenio = { nombre: string; ventas: number; valor: number };
+type FilaConvenio = {
+    nombre: string;
+    ventas: number;
+    valor: number;
+    inicial: number;
+};
 
 type Props = {
     periodo: string;
@@ -116,6 +124,12 @@ export default function Resumen({
                         detalle="Por facturar"
                     />
                     <Tile
+                        titulo="Cuotas iniciales"
+                        valor={formatearPesos(indicadores.cuotaInicial)}
+                        detalle={`${indicadores.ventasConInicial} ${indicadores.ventasConInicial === 1 ? 'venta' : 'ventas'} con cuota inicial · sin contar las caídas`}
+                        className="sm:col-span-2"
+                    />
+                    <Tile
                         titulo="Devueltas"
                         valor={String(indicadores.devueltas)}
                         detalle="Esperando corrección"
@@ -137,14 +151,17 @@ export default function Resumen({
                     </Tarjeta>
 
                     <Tarjeta
-                        titulo="Valor vendido por convenio"
-                        subtitulo="Sin contar las caídas"
+                        titulo="Ventas por convenio"
+                        subtitulo="Valor vendido y cuota inicial, sin contar las caídas"
                         className="xl:col-span-2"
                     >
                         {porConvenio.length === 0 ? (
                             <SinDatos />
                         ) : (
-                            <GraficaPorConvenio datos={porConvenio} />
+                            <div className="flex flex-col gap-4">
+                                <GraficaPorConvenio datos={porConvenio} />
+                                <TablaConvenios filas={porConvenio} />
+                            </div>
                         )}
                     </Tarjeta>
                 </div>
@@ -168,13 +185,17 @@ function Tile({
     titulo,
     valor,
     detalle,
+    className,
 }: {
     titulo: string;
     valor: string;
     detalle: string;
+    className?: string;
 }) {
     return (
-        <div className="rounded-xl border bg-card p-4 shadow-xs">
+        <div
+            className={cn('rounded-xl border bg-card p-4 shadow-xs', className)}
+        >
             <p className="text-sm text-muted-foreground">{titulo}</p>
             <p className="mt-1 text-2xl font-semibold">{valor}</p>
             <p className="mt-1 text-sm text-muted-foreground">{detalle}</p>
@@ -310,7 +331,8 @@ function GraficaPorConvenio({ datos }: { datos: FilaConvenio[] }) {
                                 <CajaTooltip
                                     titulo={fila.nombre}
                                     lineas={[
-                                        formatearPesos(fila.valor),
+                                        `Vendido: ${formatearPesos(fila.valor)}`,
+                                        `Cuota inicial: ${formatearPesos(fila.inicial)}`,
                                         `${fila.ventas} ${fila.ventas === 1 ? 'venta' : 'ventas'}`,
                                     ]}
                                 />
@@ -353,6 +375,9 @@ function TablaAsesores({ filas }: { filas: FilaAsesor[] }) {
                             Valor vendido
                         </th>
                         <th className="px-4 py-2 text-right font-medium">
+                            Cuota inicial
+                        </th>
+                        <th className="px-4 py-2 text-right font-medium">
                             Facturadas
                         </th>
                         <th className="px-4 py-2 text-right font-medium">
@@ -379,6 +404,9 @@ function TablaAsesores({ filas }: { filas: FilaAsesor[] }) {
                                 {formatearPesos(fila.valor)}
                             </td>
                             <td className="px-4 py-2 text-right">
+                                {formatearPesos(fila.inicial)}
+                            </td>
+                            <td className="px-4 py-2 text-right">
                                 {fila.facturadas}
                             </td>
                             <td className="px-4 py-2 text-right">
@@ -386,6 +414,50 @@ function TablaAsesores({ filas }: { filas: FilaAsesor[] }) {
                             </td>
                             <td className="py-2 pl-4 text-right">
                                 {fila.caidas}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function TablaConvenios({ filas }: { filas: FilaConvenio[] }) {
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm tabular-nums">
+                <thead className="text-left text-muted-foreground">
+                    <tr className="border-b">
+                        <th className="py-2 pr-3 font-medium">Convenio</th>
+                        <th className="px-3 py-2 text-right font-medium">
+                            Ventas
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                            Vendido
+                        </th>
+                        <th className="py-2 pl-3 text-right font-medium">
+                            Cuota inicial
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {filas.map((fila) => (
+                        <tr
+                            key={fila.nombre}
+                            className="border-b last:border-0"
+                        >
+                            <td className="py-2 pr-3 font-medium">
+                                {fila.nombre}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                                {fila.ventas}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                                {formatearPesos(fila.valor)}
+                            </td>
+                            <td className="py-2 pl-3 text-right">
+                                {formatearPesos(fila.inicial)}
                             </td>
                         </tr>
                     ))}
