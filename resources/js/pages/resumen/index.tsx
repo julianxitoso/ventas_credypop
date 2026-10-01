@@ -4,6 +4,7 @@ import {
     Bar,
     BarChart,
     CartesianGrid,
+    Cell,
     LabelList,
     ResponsiveContainer,
     Tooltip,
@@ -27,7 +28,15 @@ type Indicadores = {
     caidas: number;
 };
 
-type Dia = { dia: string; etiqueta: string; cantidad: number; valor: number };
+type Dia = {
+    dia: string;
+    etiqueta: string;
+    cantidad: number;
+    valor: number;
+    facturadas: number;
+    pendientes: number;
+    devueltas: number;
+};
 
 type FilaAsesor = {
     id: number;
@@ -46,6 +55,8 @@ type FilaConvenio = {
     ventas: number;
     valor: number;
     inicial: number;
+    /** Posición fija del color del convenio en la paleta (0 a 7). */
+    color: number;
 };
 
 type Props = {
@@ -58,9 +69,32 @@ type Props = {
     porConvenio: FilaConvenio[];
 };
 
-const COLOR_SERIE = 'var(--color-chart-1)';
 const COLOR_GUIA = 'var(--color-border)';
 const COLOR_TEXTO_EJE = 'var(--color-muted-foreground)';
+const COLOR_SUPERFICIE = 'var(--color-card)';
+
+/** Estados apilados en la gráfica por día, de abajo hacia arriba. */
+const ESTADOS_POR_DIA = [
+    {
+        clave: 'facturadas',
+        etiqueta: 'Facturadas',
+        color: 'var(--grafica-facturada)',
+    },
+    {
+        clave: 'pendientes',
+        etiqueta: 'Pendientes',
+        color: 'var(--grafica-pendiente)',
+    },
+    {
+        clave: 'devueltas',
+        etiqueta: 'Devueltas',
+        color: 'var(--grafica-devuelta)',
+    },
+] as const;
+
+function colorConvenio(posicion: number): string {
+    return `var(--convenio-${posicion + 1})`;
+}
 
 export default function Resumen({
     periodo,
@@ -149,7 +183,7 @@ export default function Resumen({
                 <div className="grid gap-4 xl:grid-cols-5">
                     <Tarjeta
                         titulo="Ventas por día"
-                        subtitulo="Cantidad de ventas registradas (sin caídas)"
+                        subtitulo="Ventas registradas cada día según su estado actual (sin caídas)"
                         className="xl:col-span-3"
                     >
                         <GraficaPorDia datos={porDia} />
@@ -251,55 +285,135 @@ function CajaTooltip({ titulo, lineas }: { titulo: string; lineas: string[] }) {
     );
 }
 
+type ClaveEstado = (typeof ESTADOS_POR_DIA)[number]['clave'];
+
+/**
+ * Segmento de la barra apilada: solo el segmento superior de cada día lleva
+ * las esquinas redondeadas; el borde del color del fondo separa los segmentos.
+ */
+function segmentoApilado(clave: ClaveEstado) {
+    const posicion = ESTADOS_POR_DIA.findIndex((e) => e.clave === clave);
+
+    return function Segmento(props: unknown) {
+        const { x, y, width, height, fill, payload } = props as {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            fill: string;
+            payload: Dia;
+        };
+
+        if (!height || height <= 0) {
+            return <g />;
+        }
+
+        const esSuperior = ESTADOS_POR_DIA.slice(posicion + 1).every(
+            (e) => payload[e.clave] === 0,
+        );
+        const r = esSuperior ? Math.min(4, height, width / 2) : 0;
+
+        return (
+            <path
+                d={`M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} Z`}
+                fill={fill}
+                stroke={COLOR_SUPERFICIE}
+                strokeWidth={2}
+            />
+        );
+    };
+}
+
 function GraficaPorDia({ datos }: { datos: Dia[] }) {
     return (
-        <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                    data={datos}
-                    margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
-                >
-                    <CartesianGrid vertical={false} stroke={COLOR_GUIA} />
-                    <XAxis
-                        dataKey="etiqueta"
-                        tickLine={false}
-                        axisLine={{ stroke: COLOR_GUIA }}
-                        tick={{ fill: COLOR_TEXTO_EJE, fontSize: 12 }}
-                        interval="preserveStartEnd"
-                        minTickGap={12}
-                    />
-                    <YAxis
-                        allowDecimals={false}
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fill: COLOR_TEXTO_EJE, fontSize: 12 }}
-                    />
-                    <Tooltip
-                        cursor={{ fill: 'var(--color-muted)' }}
-                        content={({ active, payload }) => {
-                            const dia = payload?.[0]?.payload as
-                                | Dia
-                                | undefined;
+        <div className="flex flex-col gap-3">
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                {ESTADOS_POR_DIA.map((estado) => (
+                    <li
+                        key={estado.clave}
+                        className="flex items-center gap-1.5"
+                    >
+                        <span
+                            aria-hidden
+                            className="size-2.5 rounded-full"
+                            style={{ backgroundColor: estado.color }}
+                        />
+                        {estado.etiqueta}
+                    </li>
+                ))}
+            </ul>
+            <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                        data={datos}
+                        margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+                    >
+                        <CartesianGrid vertical={false} stroke={COLOR_GUIA} />
+                        <XAxis
+                            dataKey="etiqueta"
+                            tickLine={false}
+                            axisLine={{ stroke: COLOR_GUIA }}
+                            tick={{ fill: COLOR_TEXTO_EJE, fontSize: 12 }}
+                            interval="preserveStartEnd"
+                            minTickGap={12}
+                        />
+                        <YAxis
+                            allowDecimals={false}
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: COLOR_TEXTO_EJE, fontSize: 12 }}
+                        />
+                        <Tooltip
+                            cursor={{ fill: 'var(--color-muted)' }}
+                            content={({ active, payload }) => {
+                                const dia = payload?.[0]?.payload as
+                                    | Dia
+                                    | undefined;
 
-                            return active && dia ? (
-                                <CajaTooltip
-                                    titulo={dia.etiqueta}
-                                    lineas={[
-                                        `${dia.cantidad} ${dia.cantidad === 1 ? 'venta' : 'ventas'}`,
-                                        formatearPesos(dia.valor),
-                                    ]}
-                                />
-                            ) : null;
-                        }}
-                    />
-                    <Bar
-                        dataKey="cantidad"
-                        fill={COLOR_SERIE}
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={24}
-                    />
-                </BarChart>
-            </ResponsiveContainer>
+                                return active && dia ? (
+                                    <div className="rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md">
+                                        <p className="font-medium">
+                                            {dia.etiqueta} ·{' '}
+                                            {formatearPesos(dia.valor)}
+                                        </p>
+                                        {ESTADOS_POR_DIA.slice()
+                                            .reverse()
+                                            .map((estado) => (
+                                                <p
+                                                    key={estado.clave}
+                                                    className="flex items-center gap-1.5 text-muted-foreground"
+                                                >
+                                                    <span
+                                                        aria-hidden
+                                                        className="size-2 rounded-full"
+                                                        style={{
+                                                            backgroundColor:
+                                                                estado.color,
+                                                        }}
+                                                    />
+                                                    {estado.etiqueta}:{' '}
+                                                    {dia[estado.clave]}
+                                                </p>
+                                            ))}
+                                    </div>
+                                ) : null;
+                            }}
+                        />
+                        {ESTADOS_POR_DIA.map((estado) => (
+                            <Bar
+                                key={estado.clave}
+                                dataKey={estado.clave}
+                                name={estado.etiqueta}
+                                stackId="estado"
+                                fill={estado.color}
+                                maxBarSize={24}
+                                shape={segmentoApilado(estado.clave)}
+                                isAnimationActive={false}
+                            />
+                        ))}
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
         </div>
     );
 }
@@ -344,12 +458,13 @@ function GraficaPorConvenio({ datos }: { datos: FilaConvenio[] }) {
                             ) : null;
                         }}
                     />
-                    <Bar
-                        dataKey="valor"
-                        fill={COLOR_SERIE}
-                        radius={[0, 4, 4, 0]}
-                        maxBarSize={24}
-                    >
+                    <Bar dataKey="valor" radius={[0, 4, 4, 0]} maxBarSize={24}>
+                        {datos.map((fila) => (
+                            <Cell
+                                key={fila.nombre}
+                                fill={colorConvenio(fila.color)}
+                            />
+                        ))}
                         <LabelList
                             dataKey="valor"
                             position="right"
@@ -453,7 +568,18 @@ function TablaConvenios({ filas }: { filas: FilaConvenio[] }) {
                             className="border-b last:border-0"
                         >
                             <td className="py-2 pr-3 font-medium">
-                                {fila.nombre}
+                                <span className="flex items-center gap-2">
+                                    <span
+                                        aria-hidden
+                                        className="size-2.5 shrink-0 rounded-full"
+                                        style={{
+                                            backgroundColor: colorConvenio(
+                                                fila.color,
+                                            ),
+                                        }}
+                                    />
+                                    {fila.nombre}
+                                </span>
                             </td>
                             <td className="px-3 py-2 text-right">
                                 {fila.ventas}

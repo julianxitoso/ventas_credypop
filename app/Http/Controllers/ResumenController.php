@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EstadoVenta;
+use App\Models\Convenio;
 use App\Models\Venta;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -18,6 +19,9 @@ use Inertia\Response;
  */
 class ResumenController extends Controller
 {
+    /** Cantidad de colores de la paleta de convenios (ver resources/css/app.css). */
+    private const COLORES_CONVENIO = 8;
+
     private const PERIODOS = [
         'hoy' => 'Hoy',
         'semana' => 'Esta semana',
@@ -104,15 +108,19 @@ class ResumenController extends Controller
     }
 
     /**
-     * Ventas (sin caídas) de cada día del período, incluidos los días en cero.
+     * Ventas (sin caídas) de cada día del período, separadas por estado,
+     * incluidos los días en cero.
      *
-     * @return list<array{dia: string, etiqueta: string, cantidad: int, valor: int}>
+     * @return list<array{dia: string, etiqueta: string, cantidad: int, valor: int, facturadas: int, pendientes: int, devueltas: int}>
      */
     private function porDia(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
         $totales = $this->ventasDelPeriodo($desde, $hasta)
             ->where('estado', '!=', EstadoVenta::Caida->value)
             ->selectRaw('date(created_at) as dia, count(*) as cantidad, sum(valor_venta) as valor')
+            ->selectRaw('sum(case when estado = ? then 1 else 0 end) as facturadas', [EstadoVenta::Facturada->value])
+            ->selectRaw('sum(case when estado = ? then 1 else 0 end) as pendientes', [EstadoVenta::Pendiente->value])
+            ->selectRaw('sum(case when estado = ? then 1 else 0 end) as devueltas', [EstadoVenta::Devuelta->value])
             ->groupByRaw('date(created_at)')
             ->get()
             ->keyBy('dia');
@@ -128,6 +136,9 @@ class ResumenController extends Controller
                 'etiqueta' => $dia->format('d/m'),
                 'cantidad' => (int) ($total->cantidad ?? 0),
                 'valor' => (int) ($total->valor ?? 0),
+                'facturadas' => (int) ($total->facturadas ?? 0),
+                'pendientes' => (int) ($total->pendientes ?? 0),
+                'devueltas' => (int) ($total->devueltas ?? 0),
             ];
         }
 
@@ -166,14 +177,19 @@ class ResumenController extends Controller
     }
 
     /**
-     * @return list<array{nombre: string, ventas: int, valor: int, inicial: int}>
+     * Totales por convenio. Cada convenio lleva un color fijo según su orden de
+     * creación, para que conserve el mismo color en cualquier período.
+     *
+     * @return list<array{nombre: string, ventas: int, valor: int, inicial: int, color: int}>
      */
     private function porConvenio(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
+        $posicion = Convenio::query()->orderBy('id')->pluck('id')->flip();
+
         return array_values($this->ventasDelPeriodo($desde, $hasta)
             ->join('convenios', 'convenios.id', '=', 'ventas.convenio_id')
             ->where('ventas.estado', '!=', EstadoVenta::Caida->value)
-            ->select('convenios.nombre')
+            ->select('convenios.id', 'convenios.nombre')
             ->selectRaw('count(*) as ventas, sum(ventas.valor_venta) as valor, sum(ventas.valor_inicial) as inicial')
             ->groupBy('convenios.id', 'convenios.nombre')
             ->orderByDesc('valor')
@@ -183,6 +199,7 @@ class ResumenController extends Controller
                 'ventas' => (int) $fila->ventas,
                 'valor' => (int) $fila->valor,
                 'inicial' => (int) $fila->inicial,
+                'color' => (int) $posicion->get($fila->id, 0) % self::COLORES_CONVENIO,
             ])
             ->all());
     }

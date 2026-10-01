@@ -73,6 +73,22 @@
     --marca-indigo: #2b3086;
     --marca-naranja: #eb4f1a;
 
+    /*
+     * Colores de las gráficas, validados para daltonismo y contraste
+     * (paleta de categorías: el orden importa, no reordenar sin revalidar).
+     */
+    --grafica-facturada: #0f9f6e;
+    --grafica-pendiente: #eda100;
+    --grafica-devuelta: #d03b3b;
+    --convenio-1: #4a3aa7;
+    --convenio-2: #eb6834;
+    --convenio-3: #1baf7a;
+    --convenio-4: #eda100;
+    --convenio-5: #e87ba4;
+    --convenio-6: #2a78d6;
+    --convenio-7: #e34948;
+    --convenio-8: #008300;
+
     --background: #fbfbfe;
     --foreground: #14162e;
     --card: #ffffff;
@@ -111,6 +127,18 @@
 .dark {
     --marca-indigo: #8d92f2;
     --marca-naranja: #ff6a33;
+
+    --grafica-facturada: #1baf7a;
+    --grafica-pendiente: #c98500;
+    --grafica-devuelta: #d03b3b;
+    --convenio-1: #9085e9;
+    --convenio-2: #d95926;
+    --convenio-3: #199e70;
+    --convenio-4: #c98500;
+    --convenio-5: #d55181;
+    --convenio-6: #3987e5;
+    --convenio-7: #e66767;
+    --convenio-8: #008300;
 
     --background: #0e1024;
     --foreground: #ecedf7;

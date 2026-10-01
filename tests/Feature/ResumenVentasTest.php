@@ -48,8 +48,14 @@ test('the dashboard summarizes the current month without fallen sales in the val
                 'caidas' => 1,
             ])
             ->has('porDia', 17)
-            ->where('porDia.15', ['dia' => '2026-09-16', 'etiqueta' => '16/09', 'cantidad' => 1, 'valor' => 1_000_000])
-            ->where('porDia.16', ['dia' => '2026-09-17', 'etiqueta' => '17/09', 'cantidad' => 2, 'valor' => 2_500_000])
+            ->where('porDia.15', [
+                'dia' => '2026-09-16', 'etiqueta' => '16/09', 'cantidad' => 1, 'valor' => 1_000_000,
+                'facturadas' => 1, 'pendientes' => 0, 'devueltas' => 0,
+            ])
+            ->where('porDia.16', [
+                'dia' => '2026-09-17', 'etiqueta' => '17/09', 'cantidad' => 2, 'valor' => 2_500_000,
+                'facturadas' => 0, 'pendientes' => 1, 'devueltas' => 1,
+            ])
             ->where('porDia.1.cantidad', 0),
         );
 });
@@ -71,9 +77,18 @@ test('the dashboard groups sales by asesor and by convenio', function () {
             ->where('porAsesor.1.devueltas', 1)
             ->where('porAsesor.1.caidas', 1)
             ->where('porConvenio', [
-                ['nombre' => 'Addi', 'ventas' => 1, 'valor' => 2_000_000, 'inicial' => 0],
-                ['nombre' => 'Contado', 'ventas' => 2, 'valor' => 1_500_000, 'inicial' => 300_000],
+                ['nombre' => 'Addi', 'ventas' => 1, 'valor' => 2_000_000, 'inicial' => 0, 'color' => 1],
+                ['nombre' => 'Contado', 'ventas' => 2, 'valor' => 1_500_000, 'inicial' => 300_000, 'color' => 0],
             ]),
+        );
+});
+
+test('each convenio keeps its color in any period', function () {
+    $this->actingAs($this->gerente)
+        ->get(route('resumen', ['periodo' => 'mes_anterior']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('porConvenio.0.nombre', 'Contado')
+            ->where('porConvenio.0.color', 0),
         );
 });
 
