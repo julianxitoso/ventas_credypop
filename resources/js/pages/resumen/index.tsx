@@ -16,13 +16,16 @@ import { cn } from '@/lib/utils';
 import { resumen } from '@/routes';
 
 type Indicadores = {
-    registradas: number;
+    /** Solo ventas facturadas: la venta real. */
     valorVendido: number;
+    /** Pendientes + devueltas: aún pueden caerse. */
+    porFacturar: number;
+    totalRegistrado: number;
+    /** Todas las ventas no caídas: la inicial se recibe al registrar. */
     cuotaInicial: number;
-    valorSinIniciales: number;
     ventasConInicial: number;
+    valorSinIniciales: number;
     facturadas: number;
-    valorFacturado: number;
     pendientes: number;
     devueltas: number;
     caidas: number;
@@ -44,6 +47,7 @@ type FilaAsesor = {
     usuario: string;
     ventas: number;
     valor: number;
+    porFacturar: number;
     inicial: number;
     facturadas: number;
     devueltas: number;
@@ -54,6 +58,7 @@ type FilaConvenio = {
     nombre: string;
     ventas: number;
     valor: number;
+    porFacturar: number;
     inicial: number;
     /** Posición fija del color del convenio en la paleta (0 a 7). */
     color: number;
@@ -91,6 +96,10 @@ const ESTADOS_POR_DIA = [
         color: 'var(--grafica-devuelta)',
     },
 ] as const;
+
+function plural(cantidad: number, singular: string, varios: string): string {
+    return `${cantidad} ${cantidad === 1 ? singular : varios}`;
+}
 
 function colorConvenio(posicion: number): string {
     return `var(--convenio-${posicion + 1})`;
@@ -138,35 +147,38 @@ export default function Resumen({
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-xl border bg-card p-4 shadow-xs sm:col-span-2">
                         <p className="text-sm text-muted-foreground">
-                            Valor vendido
+                            Valor vendido (facturado)
                         </p>
                         <p className="mt-1 text-4xl font-semibold">
                             {formatearPesos(indicadores.valorVendido)}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            {indicadores.registradas} ventas registradas · sin
-                            contar las caídas
+                            {plural(
+                                indicadores.facturadas,
+                                'venta facturada',
+                                'ventas facturadas',
+                            )}
                         </p>
                     </div>
                     <Tile
+                        titulo="Por facturar"
+                        valor={formatearPesos(indicadores.porFacturar)}
+                        detalle={`${plural(indicadores.pendientes, 'pendiente', 'pendientes')} · ${plural(indicadores.devueltas, 'devuelta', 'devueltas')}`}
+                    />
+                    <Tile
+                        titulo="Total registrado"
+                        valor={formatearPesos(indicadores.totalRegistrado)}
+                        detalle="Vendido + por facturar, sin caídas"
+                    />
+                    <Tile
                         titulo="Cuotas iniciales"
                         valor={formatearPesos(indicadores.cuotaInicial)}
-                        detalle={`${indicadores.ventasConInicial} ${indicadores.ventasConInicial === 1 ? 'venta' : 'ventas'} con cuota inicial`}
+                        detalle={`${plural(indicadores.ventasConInicial, 'venta', 'ventas')} con inicial, sin caídas`}
                     />
                     <Tile
-                        titulo="Valor vendido sin iniciales"
+                        titulo="Vendido sin iniciales"
                         valor={formatearPesos(indicadores.valorSinIniciales)}
-                        detalle="Valor vendido − cuotas iniciales"
-                    />
-                    <Tile
-                        titulo="Facturadas"
-                        valor={String(indicadores.facturadas)}
-                        detalle={formatearPesos(indicadores.valorFacturado)}
-                    />
-                    <Tile
-                        titulo="Pendientes"
-                        valor={String(indicadores.pendientes)}
-                        detalle="Por facturar"
+                        detalle="Facturado − sus cuotas iniciales"
                     />
                     <Tile
                         titulo="Devueltas"
@@ -191,7 +203,7 @@ export default function Resumen({
 
                     <Tarjeta
                         titulo="Ventas por convenio"
-                        subtitulo="Valor vendido y cuota inicial, sin contar las caídas"
+                        subtitulo="La gráfica muestra lo vendido (facturado); la tabla agrega lo que está por facturar y la cuota inicial. Sin caídas."
                         className="xl:col-span-2"
                     >
                         {porConvenio.length === 0 ? (
@@ -451,8 +463,9 @@ function GraficaPorConvenio({ datos }: { datos: FilaConvenio[] }) {
                                     titulo={fila.nombre}
                                     lineas={[
                                         `Vendido: ${formatearPesos(fila.valor)}`,
+                                        `Por facturar: ${formatearPesos(fila.porFacturar)}`,
                                         `Cuota inicial: ${formatearPesos(fila.inicial)}`,
-                                        `${fila.ventas} ${fila.ventas === 1 ? 'venta' : 'ventas'}`,
+                                        plural(fila.ventas, 'venta', 'ventas'),
                                     ]}
                                 />
                             ) : null;
@@ -492,7 +505,10 @@ function TablaAsesores({ filas }: { filas: FilaAsesor[] }) {
                             Ventas
                         </th>
                         <th className="px-4 py-2 text-right font-medium">
-                            Valor vendido
+                            Vendido
+                        </th>
+                        <th className="px-4 py-2 text-right font-medium">
+                            Por facturar
                         </th>
                         <th className="px-4 py-2 text-right font-medium">
                             Cuota inicial
@@ -524,6 +540,9 @@ function TablaAsesores({ filas }: { filas: FilaAsesor[] }) {
                                 {formatearPesos(fila.valor)}
                             </td>
                             <td className="px-4 py-2 text-right">
+                                {formatearPesos(fila.porFacturar)}
+                            </td>
+                            <td className="px-4 py-2 text-right">
                                 {formatearPesos(fila.inicial)}
                             </td>
                             <td className="px-4 py-2 text-right">
@@ -551,10 +570,10 @@ function TablaConvenios({ filas }: { filas: FilaConvenio[] }) {
                     <tr className="border-b">
                         <th className="py-2 pr-3 font-medium">Convenio</th>
                         <th className="px-3 py-2 text-right font-medium">
-                            Ventas
+                            Vendido
                         </th>
                         <th className="px-3 py-2 text-right font-medium">
-                            Vendido
+                            Por facturar
                         </th>
                         <th className="py-2 pl-3 text-right font-medium">
                             Cuota inicial
@@ -581,11 +600,11 @@ function TablaConvenios({ filas }: { filas: FilaConvenio[] }) {
                                     {fila.nombre}
                                 </span>
                             </td>
-                            <td className="px-3 py-2 text-right">
-                                {fila.ventas}
+                            <td className="px-3 py-2 text-right font-medium">
+                                {formatearPesos(fila.valor)}
                             </td>
                             <td className="px-3 py-2 text-right">
-                                {formatearPesos(fila.valor)}
+                                {formatearPesos(fila.porFacturar)}
                             </td>
                             <td className="py-2 pl-3 text-right">
                                 {formatearPesos(fila.inicial)}

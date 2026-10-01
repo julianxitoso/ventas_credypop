@@ -28,7 +28,7 @@ beforeEach(function () {
     $venta($this->luis, $this->contado, 7_000_000, 700_000, EstadoVenta::Facturada, '2026-08-20 08:00');
 });
 
-test('the dashboard summarizes the current month without fallen sales in the value or down payments', function () {
+test('only billed sales count as sold and down payments count for every sale that did not fall', function () {
     $this->actingAs($this->gerente)
         ->get(route('resumen'))
         ->assertInertia(fn (Assert $page) => $page
@@ -36,13 +36,13 @@ test('the dashboard summarizes the current month without fallen sales in the val
             ->where('periodo', 'mes')
             ->where('rango', '01/09/2026 – 17/09/2026')
             ->where('indicadores', [
-                'registradas' => 4,
-                'valorVendido' => 3_500_000,
+                'valorVendido' => 1_000_000,
+                'porFacturar' => 2_500_000,
+                'totalRegistrado' => 3_500_000,
                 'cuotaInicial' => 300_000,
-                'valorSinIniciales' => 3_200_000,
                 'ventasConInicial' => 2,
+                'valorSinIniciales' => 800_000,
                 'facturadas' => 1,
-                'valorFacturado' => 1_000_000,
                 'pendientes' => 1,
                 'devueltas' => 1,
                 'caidas' => 1,
@@ -67,18 +67,20 @@ test('the dashboard groups sales by asesor and by convenio', function () {
             ->has('porAsesor', 2)
             ->where('porAsesor.0.nombre', 'Ana')
             ->where('porAsesor.0.ventas', 2)
-            ->where('porAsesor.0.valor', 3_000_000)
+            ->where('porAsesor.0.valor', 1_000_000)
+            ->where('porAsesor.0.porFacturar', 2_000_000)
             ->where('porAsesor.0.inicial', 200_000)
             ->where('porAsesor.0.facturadas', 1)
             ->where('porAsesor.1.nombre', 'Luis')
             ->where('porAsesor.1.ventas', 2)
-            ->where('porAsesor.1.valor', 500_000)
+            ->where('porAsesor.1.valor', 0)
+            ->where('porAsesor.1.porFacturar', 500_000)
             ->where('porAsesor.1.inicial', 100_000)
             ->where('porAsesor.1.devueltas', 1)
             ->where('porAsesor.1.caidas', 1)
             ->where('porConvenio', [
-                ['nombre' => 'Addi', 'ventas' => 1, 'valor' => 2_000_000, 'inicial' => 0, 'color' => 1],
-                ['nombre' => 'Contado', 'ventas' => 2, 'valor' => 1_500_000, 'inicial' => 300_000, 'color' => 0],
+                ['nombre' => 'Contado', 'ventas' => 2, 'valor' => 1_000_000, 'porFacturar' => 500_000, 'inicial' => 300_000, 'color' => 0],
+                ['nombre' => 'Addi', 'ventas' => 1, 'valor' => 0, 'porFacturar' => 2_000_000, 'inicial' => 0, 'color' => 1],
             ]),
         );
 });
@@ -92,16 +94,16 @@ test('each convenio keeps its color in any period', function () {
         );
 });
 
-test('the dashboard can show other periods', function (string $periodo, int $registradas, int $dias) {
+test('the dashboard can show other periods', function (string $periodo, int $totalRegistrado, int $dias) {
     $this->actingAs($this->gerente)
         ->get(route('resumen', ['periodo' => $periodo]))
         ->assertInertia(fn (Assert $page) => $page
             ->where('periodo', $periodo)
-            ->where('indicadores.registradas', $registradas)
+            ->where('indicadores.totalRegistrado', $totalRegistrado)
             ->has('porDia', $dias),
         );
 })->with([
-    'hoy' => ['hoy', 2, 1],
-    'semana (lunes 14 al jueves 17)' => ['semana', 3, 4],
-    'mes anterior' => ['mes_anterior', 1, 31],
+    'hoy' => ['hoy', 2_500_000, 1],
+    'semana (lunes 14 al jueves 17)' => ['semana', 3_500_000, 4],
+    'mes anterior' => ['mes_anterior', 7_000_000, 31],
 ]);

@@ -14,8 +14,13 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Dashboard del gerente y del administrador. El "valor vendido" y la
- * "cuota inicial" no incluyen las ventas caídas porque no se concretaron.
+ * Dashboard del gerente y del administrador.
+ *
+ * - "Valor vendido" es solo lo facturado: la venta real que cuadra con el ERP.
+ * - "Por facturar" son las ventas pendientes y devueltas, que aún pueden caerse.
+ * - La "cuota inicial" se recibe al registrar la venta, así que cuenta para
+ *   todas las ventas no caídas (si la venta se cae, se le devuelve al cliente).
+ * - Las ventas caídas no suman en ningún valor.
  */
 class ResumenController extends Controller
 {
@@ -90,17 +95,17 @@ class ResumenController extends Controller
 
         $dato = fn (EstadoVenta $estado, string $campo): int => (int) ($porEstado->get($estado->value)->{$campo} ?? 0);
 
-        $valorVendido = (int) $porEstado->sum('valor') - $dato(EstadoVenta::Caida, 'valor');
-        $cuotaInicial = (int) $porEstado->sum('inicial') - $dato(EstadoVenta::Caida, 'inicial');
+        $valorVendido = $dato(EstadoVenta::Facturada, 'valor');
+        $porFacturar = $dato(EstadoVenta::Pendiente, 'valor') + $dato(EstadoVenta::Devuelta, 'valor');
 
         return [
-            'registradas' => (int) $porEstado->sum('cantidad'),
             'valorVendido' => $valorVendido,
-            'cuotaInicial' => $cuotaInicial,
-            'valorSinIniciales' => $valorVendido - $cuotaInicial,
+            'porFacturar' => $porFacturar,
+            'totalRegistrado' => $valorVendido + $porFacturar,
+            'cuotaInicial' => (int) $porEstado->sum('inicial') - $dato(EstadoVenta::Caida, 'inicial'),
             'ventasConInicial' => (int) $porEstado->sum('con_inicial') - $dato(EstadoVenta::Caida, 'con_inicial'),
+            'valorSinIniciales' => $valorVendido - $dato(EstadoVenta::Facturada, 'inicial'),
             'facturadas' => $dato(EstadoVenta::Facturada, 'cantidad'),
-            'valorFacturado' => $dato(EstadoVenta::Facturada, 'valor'),
             'pendientes' => $dato(EstadoVenta::Pendiente, 'cantidad'),
             'devueltas' => $dato(EstadoVenta::Devuelta, 'cantidad'),
             'caidas' => $dato(EstadoVenta::Caida, 'cantidad'),
@@ -146,7 +151,10 @@ class ResumenController extends Controller
     }
 
     /**
-     * @return list<array{id: int, nombre: string, usuario: string, ventas: int, valor: int, inicial: int, facturadas: int, devueltas: int, caidas: int}>
+     * Por asesor: vendido (facturado), por facturar y cuota inicial recibida.
+     * Ordenado por lo vendido realmente.
+     *
+     * @return list<array{id: int, nombre: string, usuario: string, ventas: int, valor: int, porFacturar: int, inicial: int, facturadas: int, devueltas: int, caidas: int}>
      */
     private function porAsesor(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
@@ -154,13 +162,15 @@ class ResumenController extends Controller
             ->join('users', 'users.id', '=', 'ventas.asesor_id')
             ->select('users.id', 'users.name', 'users.usuario')
             ->selectRaw('count(*) as ventas')
-            ->selectRaw('sum(case when ventas.estado != ? then ventas.valor_venta else 0 end) as valor', [EstadoVenta::Caida->value])
+            ->selectRaw('sum(case when ventas.estado = ? then ventas.valor_venta else 0 end) as valor', [EstadoVenta::Facturada->value])
+            ->selectRaw('sum(case when ventas.estado in (?, ?) then ventas.valor_venta else 0 end) as por_facturar', [EstadoVenta::Pendiente->value, EstadoVenta::Devuelta->value])
             ->selectRaw('sum(case when ventas.estado != ? then ventas.valor_inicial else 0 end) as inicial', [EstadoVenta::Caida->value])
             ->selectRaw('sum(case when ventas.estado = ? then 1 else 0 end) as facturadas', [EstadoVenta::Facturada->value])
             ->selectRaw('sum(case when ventas.estado = ? then 1 else 0 end) as devueltas', [EstadoVenta::Devuelta->value])
             ->selectRaw('sum(case when ventas.estado = ? then 1 else 0 end) as caidas', [EstadoVenta::Caida->value])
             ->groupBy('users.id', 'users.name', 'users.usuario')
             ->orderByDesc('valor')
+            ->orderByDesc('por_facturar')
             ->get()
             ->map(fn (object $fila): array => [
                 'id' => (int) $fila->id,
@@ -168,6 +178,7 @@ class ResumenController extends Controller
                 'usuario' => (string) $fila->usuario,
                 'ventas' => (int) $fila->ventas,
                 'valor' => (int) $fila->valor,
+                'porFacturar' => (int) $fila->por_facturar,
                 'inicial' => (int) $fila->inicial,
                 'facturadas' => (int) $fila->facturadas,
                 'devueltas' => (int) $fila->devueltas,
@@ -177,10 +188,11 @@ class ResumenController extends Controller
     }
 
     /**
-     * Totales por convenio. Cada convenio lleva un color fijo según su orden de
+     * Totales por convenio (sin caídas): vendido (facturado), por facturar y
+     * cuota inicial. Cada convenio lleva un color fijo según su orden de
      * creación, para que conserve el mismo color en cualquier período.
      *
-     * @return list<array{nombre: string, ventas: int, valor: int, inicial: int, color: int}>
+     * @return list<array{nombre: string, ventas: int, valor: int, porFacturar: int, inicial: int, color: int}>
      */
     private function porConvenio(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
@@ -190,14 +202,18 @@ class ResumenController extends Controller
             ->join('convenios', 'convenios.id', '=', 'ventas.convenio_id')
             ->where('ventas.estado', '!=', EstadoVenta::Caida->value)
             ->select('convenios.id', 'convenios.nombre')
-            ->selectRaw('count(*) as ventas, sum(ventas.valor_venta) as valor, sum(ventas.valor_inicial) as inicial')
+            ->selectRaw('count(*) as ventas, sum(ventas.valor_inicial) as inicial')
+            ->selectRaw('sum(case when ventas.estado = ? then ventas.valor_venta else 0 end) as valor', [EstadoVenta::Facturada->value])
+            ->selectRaw('sum(case when ventas.estado != ? then ventas.valor_venta else 0 end) as por_facturar', [EstadoVenta::Facturada->value])
             ->groupBy('convenios.id', 'convenios.nombre')
             ->orderByDesc('valor')
+            ->orderByDesc('por_facturar')
             ->get()
             ->map(fn (object $fila): array => [
                 'nombre' => (string) $fila->nombre,
                 'ventas' => (int) $fila->ventas,
                 'valor' => (int) $fila->valor,
+                'porFacturar' => (int) $fila->por_facturar,
                 'inicial' => (int) $fila->inicial,
                 'color' => (int) $posicion->get($fila->id, 0) % self::COLORES_CONVENIO,
             ])
