@@ -86,10 +86,14 @@ class ResumenController extends Controller
 
         $dato = fn (EstadoVenta $estado, string $campo): int => (int) ($porEstado->get($estado->value)->{$campo} ?? 0);
 
+        $valorVendido = (int) $porEstado->sum('valor') - $dato(EstadoVenta::Caida, 'valor');
+        $cuotaInicial = (int) $porEstado->sum('inicial') - $dato(EstadoVenta::Caida, 'inicial');
+
         return [
             'registradas' => (int) $porEstado->sum('cantidad'),
-            'valorVendido' => (int) $porEstado->sum('valor') - $dato(EstadoVenta::Caida, 'valor'),
-            'cuotaInicial' => (int) $porEstado->sum('inicial') - $dato(EstadoVenta::Caida, 'inicial'),
+            'valorVendido' => $valorVendido,
+            'cuotaInicial' => $cuotaInicial,
+            'valorSinIniciales' => $valorVendido - $cuotaInicial,
             'ventasConInicial' => (int) $porEstado->sum('con_inicial') - $dato(EstadoVenta::Caida, 'con_inicial'),
             'facturadas' => $dato(EstadoVenta::Facturada, 'cantidad'),
             'valorFacturado' => $dato(EstadoVenta::Facturada, 'valor'),

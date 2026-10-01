@@ -18,6 +18,7 @@ type Indicadores = {
     registradas: number;
     valorVendido: number;
     cuotaInicial: number;
+    valorSinIniciales: number;
     ventasConInicial: number;
     facturadas: number;
     valorFacturado: number;
@@ -114,6 +115,16 @@ export default function Resumen({
                         </p>
                     </div>
                     <Tile
+                        titulo="Cuotas iniciales"
+                        valor={formatearPesos(indicadores.cuotaInicial)}
+                        detalle={`${indicadores.ventasConInicial} ${indicadores.ventasConInicial === 1 ? 'venta' : 'ventas'} con cuota inicial`}
+                    />
+                    <Tile
+                        titulo="Valor vendido sin iniciales"
+                        valor={formatearPesos(indicadores.valorSinIniciales)}
+                        detalle="Valor vendido − cuotas iniciales"
+                    />
+                    <Tile
                         titulo="Facturadas"
                         valor={String(indicadores.facturadas)}
                         detalle={formatearPesos(indicadores.valorFacturado)}
@@ -122,12 +133,6 @@ export default function Resumen({
                         titulo="Pendientes"
                         valor={String(indicadores.pendientes)}
                         detalle="Por facturar"
-                    />
-                    <Tile
-                        titulo="Cuotas iniciales"
-                        valor={formatearPesos(indicadores.cuotaInicial)}
-                        detalle={`${indicadores.ventasConInicial} ${indicadores.ventasConInicial === 1 ? 'venta' : 'ventas'} con cuota inicial · sin contar las caídas`}
-                        className="sm:col-span-2"
                     />
                     <Tile
                         titulo="Devueltas"

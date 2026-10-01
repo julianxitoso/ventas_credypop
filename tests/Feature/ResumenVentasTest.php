@@ -39,6 +39,7 @@ test('the dashboard summarizes the current month without fallen sales in the val
                 'registradas' => 4,
                 'valorVendido' => 3_500_000,
                 'cuotaInicial' => 300_000,
+                'valorSinIniciales' => 3_200_000,
                 'ventasConInicial' => 2,
                 'facturadas' => 1,
                 'valorFacturado' => 1_000_000,
