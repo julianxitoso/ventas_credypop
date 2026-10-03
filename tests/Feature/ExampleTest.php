@@ -13,6 +13,12 @@ test('the home address sends users to their home screen', function () {
     $this->actingAs($user)->get(route('home'))->assertRedirect(route('panel'));
 });
 
+test('https requests forwarded by the local proxy are recognized as secure', function () {
+    $this->get(route('login'), ['X-Forwarded-Proto' => 'https'])->assertOk();
+
+    expect(request()->isSecure())->toBeTrue();
+});
+
 test('the removed kit screens are no longer available', function (string $url) {
     $user = User::factory()->create(['rol' => Rol::Admin]);
 

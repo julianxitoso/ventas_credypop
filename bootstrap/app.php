@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        // En el VPS, Nginx atiende HTTPS y le pasa la visita a Apache desde la misma
+        // máquina: se confía en sus encabezados solo cuando vienen de localhost.
+        $middleware->trustProxies(at: ['127.0.0.1', '::1']);
+
         $middleware->redirectUsersTo(fn (Request $request): string => $request->user()->rutaDeInicio());
 
         $middleware->web(append: [
