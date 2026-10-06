@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Enums\EstadoVenta;
 use App\Http\Resources\VentaPanelResource;
+use App\Models\ConvenioVenta;
 use App\Models\Venta;
+use App\Models\VentaProducto;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,9 +23,9 @@ class PanelController extends Controller
     private const COLUMNAS_INFORME = [
         'Venta', 'Fecha', 'Asesor', 'Usuario asesor',
         'Cliente', 'Cédula', 'Celular', 'Teléfono', 'Otro celular', 'Correo', 'Dirección', 'Ciudad',
-        'Artículo', 'Marca', 'Referencia', 'Serial',
-        'Valor venta', 'Valor inicial', 'Pago inicial', 'Número transferencia',
-        'Convenio', 'Gasto administrativo', 'Observaciones',
+        'Producto', 'Artículo', 'Marca', 'Referencia', 'Serial', 'Valor producto',
+        'Total venta', 'Valor inicial', 'Pago inicial', 'Número transferencia',
+        'Convenios', 'Gasto administrativo', 'Observaciones',
         'Estado', 'Número factura', 'Facturada en', 'Facturada por',
         'Motivo devolución', 'Devuelta en', 'Devuelta por', 'Corregida en',
         'Motivo caída', 'Caída en',
@@ -51,8 +53,9 @@ class PanelController extends Controller
     }
 
     /**
-     * Descarga en CSV (separador ";" y BOM para Excel) de las ventas
-     * que coinciden con los filtros actuales.
+     * Descarga en CSV (separador ";" y BOM para Excel) de las ventas que
+     * coinciden con los filtros actuales: una fila por producto, repitiendo
+     * los datos de la venta.
      */
     public function informe(Request $request): StreamedResponse
     {
@@ -68,9 +71,11 @@ class PanelController extends Controller
             fwrite($salida, "\xEF\xBB\xBF");
             fputcsv($salida, self::COLUMNAS_INFORME, ';', '"', '');
 
-            $this->consulta($filtros)->reorder()->lazyByIdDesc(500)->each(
-                fn (Venta $venta) => fputcsv($salida, $this->filaInforme($venta), ';', '"', ''),
-            );
+            $this->consulta($filtros)->reorder()->lazyByIdDesc(500)->each(function (Venta $venta) use ($salida): void {
+                foreach ($this->filasInforme($venta) as $fila) {
+                    fputcsv($salida, $fila, ';', '"', '');
+                }
+            });
 
             fclose($salida);
         }, 'ventas-'.now()->format('Y-m-d-His').'.csv', [
@@ -100,7 +105,7 @@ class PanelController extends Controller
     private function consulta(array $filtros): Builder
     {
         return Venta::query()
-            ->with(['asesor:id,name,usuario', 'convenio:id,nombre', 'facturador:id,name', 'devueltaPor:id,name'])
+            ->with(['asesor:id,name,usuario', 'productos', 'conveniosVenta.convenio:id,nombre', 'facturador:id,name', 'devueltaPor:id,name'])
             ->when(
                 $filtros['pestana'] === 'pendientes',
                 fn (Builder $query) => $query->where('estado', EstadoVenta::Pendiente),
@@ -129,11 +134,19 @@ class PanelController extends Controller
     }
 
     /**
-     * @return list<string|int|null>
+     * Filas del CSV de una venta: una por producto ("1 de 3", "2 de 3"…).
+     *
+     * @return list<list<string|int|null>>
      */
-    private function filaInforme(Venta $venta): array
+    private function filasInforme(Venta $venta): array
     {
-        $fila = [
+        $convenios = $venta->conveniosVenta
+            ->map(fn (ConvenioVenta $convenio): string => $convenio->convenio->nombre.' $'.number_format($convenio->valor, 0, ',', '.'))
+            ->join('; ');
+        $gasto = $venta->conveniosVenta->sum(fn (ConvenioVenta $convenio): int => $convenio->gasto_administrativo ?? 0);
+        $cantidad = $venta->productos->count();
+
+        return array_values($venta->productos->values()->map(fn (VentaProducto $producto, int $posicion): array => array_map($this->celdaSegura(...), [
             $venta->consecutivo,
             $venta->created_at->format('Y-m-d H:i'),
             $venta->asesor->name,
@@ -146,16 +159,18 @@ class PanelController extends Controller
             $venta->cliente_correo,
             $venta->cliente_direccion,
             $venta->cliente_ciudad,
-            $venta->articulo,
-            $venta->marca,
-            $venta->referencia,
-            $venta->serial,
+            ($posicion + 1).' de '.$cantidad,
+            $producto->articulo,
+            $producto->marca,
+            $producto->referencia,
+            $producto->serial,
+            $producto->valor,
             $venta->valor_venta,
             $venta->valor_inicial,
             $venta->forma_pago_inicial?->etiqueta(),
             $venta->numero_transferencia,
-            $venta->convenio->nombre,
-            $venta->gasto_administrativo,
+            $convenios,
+            $gasto > 0 ? $gasto : null,
             $venta->observaciones,
             $venta->estado->etiqueta(),
             $venta->numero_factura,
@@ -167,9 +182,7 @@ class PanelController extends Controller
             $venta->corregida_en?->format('Y-m-d H:i'),
             $venta->motivo_caida,
             $venta->caida_en?->format('Y-m-d H:i'),
-        ];
-
-        return array_map($this->celdaSegura(...), $fila);
+        ]))->all());
     }
 
     /**

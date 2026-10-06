@@ -132,17 +132,63 @@ function ContenidoDetalle({
                     <Dato etiqueta="Ciudad">{venta.cliente_ciudad || '—'}</Dato>
                 </Grupo>
 
-                <Grupo titulo="Artículo">
-                    <Dato etiqueta="Artículo">{venta.articulo}</Dato>
-                    <Dato etiqueta="Marca">{venta.marca}</Dato>
-                    <Dato etiqueta="Referencia">{venta.referencia}</Dato>
-                    <Dato etiqueta="Serial">{venta.serial}</Dato>
+                <Grupo
+                    titulo={`Productos (${venta.productos.length})`}
+                    columnas={1}
+                >
+                    <div className="overflow-x-auto rounded-md border">
+                        <table className="w-full text-sm tabular-nums">
+                            <thead className="bg-muted/50 text-left text-muted-foreground">
+                                <tr>
+                                    <th className="px-3 py-2 font-medium">
+                                        Artículo
+                                    </th>
+                                    <th className="px-3 py-2 font-medium">
+                                        Serie
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-medium">
+                                        Valor
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {venta.productos.map((producto) => (
+                                    <tr key={producto.id} className="border-t">
+                                        <td className="px-3 py-2">
+                                            <p className="font-medium">
+                                                {producto.articulo}
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                                {producto.marca} ·{' '}
+                                                {producto.referencia}
+                                            </p>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {producto.serial ?? (
+                                                <span className="text-muted-foreground">
+                                                    Sin serie
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                            {formatearPesos(producto.valor)}
+                                        </td>
+                                    </tr>
+                                ))}
+                                <tr className="border-t bg-muted/30 font-semibold">
+                                    <td className="px-3 py-2" colSpan={2}>
+                                        Total
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                        {formatearPesos(venta.valor_venta)}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </Grupo>
 
-                <Grupo titulo="Valores">
-                    <Dato etiqueta="Valor de venta">
-                        {formatearPesos(venta.valor_venta)}
-                    </Dato>
+                <Grupo titulo="Cuota inicial y convenios">
                     <Dato etiqueta="Valor de inicial">
                         {formatearPesos(venta.valor_inicial)}
                     </Dato>
@@ -153,12 +199,13 @@ function ContenidoDetalle({
                                 ` · N.º ${venta.numero_transferencia}`}
                         </Dato>
                     )}
-                    <Dato etiqueta="Convenio">{venta.convenio}</Dato>
-                    {venta.gasto_administrativo !== null && (
-                        <Dato etiqueta="Gasto administrativo">
-                            {formatearPesos(venta.gasto_administrativo)}
+                    {venta.convenios.map((convenio) => (
+                        <Dato key={convenio.nombre} etiqueta={convenio.nombre}>
+                            {formatearPesos(convenio.valor)}
+                            {convenio.gasto_administrativo !== null &&
+                                ` · Gasto administrativo ${formatearPesos(convenio.gasto_administrativo)}`}
                         </Dato>
-                    )}
+                    ))}
                 </Grupo>
 
                 {venta.observaciones && (

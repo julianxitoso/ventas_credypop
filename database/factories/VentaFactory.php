@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Convenio;
 use App\Models\User;
 use App\Models\Venta;
+use App\Models\VentaProducto;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -29,15 +30,45 @@ class VentaFactory extends Factory
             'cliente_correo' => fake()->safeEmail(),
             'cliente_direccion' => fake()->streetAddress(),
             'cliente_ciudad' => 'Popayán',
-            'articulo' => fake()->randomElement(['Televisor', 'Nevera', 'Lavadora', 'Celular']),
-            'marca' => fake()->company(),
-            'referencia' => fake()->bothify('REF-####'),
-            'serial' => fake()->unique()->bothify('SN-########'),
             'valor_venta' => 1_250_000,
             'valor_inicial' => 0,
-            'convenio_id' => Convenio::factory(),
-            'gasto_administrativo' => null,
             'observaciones' => null,
         ];
+    }
+
+    /**
+     * Si la prueba no definió productos ni convenios, la venta queda con
+     * un producto por el total y un convenio que cubre el total menos la inicial.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Venta $venta): void {
+            if (! $venta->productos()->exists()) {
+                VentaProducto::factory()->for($venta)->create(['valor' => $venta->valor_venta]);
+            }
+
+            if (! $venta->convenios()->exists()) {
+                $venta->convenios()->attach(Convenio::factory()->create(), [
+                    'valor' => max(0, $venta->valor_venta - $venta->valor_inicial),
+                    'gasto_administrativo' => null,
+                ]);
+            }
+        });
+    }
+
+    /**
+     * La venta queda con el convenio indicado (por defecto cubre el total menos la inicial).
+     */
+    public function conConvenio(Convenio $convenio, ?int $valor = null, ?int $gastoAdministrativo = null): static
+    {
+        // hasAttached se ejecuta antes que configure(), así este no agrega otro convenio.
+        return $this->hasAttached($convenio, ['valor' => $valor ?? 0, 'gasto_administrativo' => $gastoAdministrativo], 'convenios')
+            ->afterCreating(function (Venta $venta) use ($convenio, $valor): void {
+                if ($valor === null) {
+                    $venta->convenios()->updateExistingPivot($convenio->id, [
+                        'valor' => max(0, $venta->valor_venta - $venta->valor_inicial),
+                    ]);
+                }
+            });
     }
 }

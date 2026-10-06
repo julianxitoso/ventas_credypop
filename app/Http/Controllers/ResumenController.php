@@ -188,23 +188,25 @@ class ResumenController extends Controller
     }
 
     /**
-     * Totales por convenio (sin caídas): vendido (facturado), por facturar y
-     * cuota inicial. Cada convenio lleva un color fijo según su orden de
-     * creación, para que conserve el mismo color en cualquier período.
+     * Totales por convenio (sin caídas), con el valor que cubre cada convenio
+     * en cada venta: vendido (facturado) y por facturar. No incluye la cuota
+     * inicial, que no pertenece a ningún convenio. Cada convenio lleva un color
+     * fijo según su orden de creación, para que lo conserve en cualquier período.
      *
-     * @return list<array{nombre: string, ventas: int, valor: int, porFacturar: int, inicial: int, color: int}>
+     * @return list<array{nombre: string, ventas: int, valor: int, porFacturar: int, color: int}>
      */
     private function porConvenio(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
         $posicion = Convenio::query()->orderBy('id')->pluck('id')->flip();
 
         return array_values($this->ventasDelPeriodo($desde, $hasta)
-            ->join('convenios', 'convenios.id', '=', 'ventas.convenio_id')
+            ->join('convenio_venta', 'convenio_venta.venta_id', '=', 'ventas.id')
+            ->join('convenios', 'convenios.id', '=', 'convenio_venta.convenio_id')
             ->where('ventas.estado', '!=', EstadoVenta::Caida->value)
             ->select('convenios.id', 'convenios.nombre')
-            ->selectRaw('count(*) as ventas, sum(ventas.valor_inicial) as inicial')
-            ->selectRaw('sum(case when ventas.estado = ? then ventas.valor_venta else 0 end) as valor', [EstadoVenta::Facturada->value])
-            ->selectRaw('sum(case when ventas.estado != ? then ventas.valor_venta else 0 end) as por_facturar', [EstadoVenta::Facturada->value])
+            ->selectRaw('count(*) as ventas')
+            ->selectRaw('sum(case when ventas.estado = ? then convenio_venta.valor else 0 end) as valor', [EstadoVenta::Facturada->value])
+            ->selectRaw('sum(case when ventas.estado != ? then convenio_venta.valor else 0 end) as por_facturar', [EstadoVenta::Facturada->value])
             ->groupBy('convenios.id', 'convenios.nombre')
             ->orderByDesc('valor')
             ->orderByDesc('por_facturar')
@@ -214,7 +216,6 @@ class ResumenController extends Controller
                 'ventas' => (int) $fila->ventas,
                 'valor' => (int) $fila->valor,
                 'porFacturar' => (int) $fila->por_facturar,
-                'inicial' => (int) $fila->inicial,
                 'color' => (int) $posicion->get($fila->id, 0) % self::COLORES_CONVENIO,
             ])
             ->all());

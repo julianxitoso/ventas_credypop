@@ -370,9 +370,9 @@ function TablaVentas({
                                 </p>
                             </td>
                             <td className="px-4 py-3">
-                                <p>{venta.articulo}</p>
+                                <p>{venta.productos_resumen}</p>
                                 <p className="text-muted-foreground">
-                                    {venta.serial}
+                                    {venta.serial_resumen ?? 'Sin serie'}
                                 </p>
                             </td>
                             <td className="px-4 py-3">{venta.asesor}</td>
@@ -421,7 +421,7 @@ function TarjetasVentas({
                             {venta.cliente_nombre} · C.C. {venta.cliente_cedula}
                         </p>
                         <p className="text-muted-foreground">
-                            {venta.articulo} · {venta.asesor}
+                            {venta.productos_resumen} · {venta.asesor}
                         </p>
                         <p className="mt-1 font-medium">
                             {formatearPesos(venta.valor_venta)}

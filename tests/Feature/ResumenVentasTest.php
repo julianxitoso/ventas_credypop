@@ -18,7 +18,7 @@ beforeEach(function () {
 
     $venta = fn (User $asesor, Convenio $convenio, int $valor, int $inicial, EstadoVenta $estado, string $fecha) => Venta::factory()
         ->for($asesor, 'asesor')
-        ->for($convenio)
+        ->conConvenio($convenio)
         ->create(['valor_venta' => $valor, 'valor_inicial' => $inicial, 'estado' => $estado, 'created_at' => $fecha]);
 
     $venta($this->ana, $this->contado, 1_000_000, 200_000, EstadoVenta::Facturada, '2026-09-16 09:00');
@@ -79,10 +79,32 @@ test('the dashboard groups sales by asesor and by convenio', function () {
             ->where('porAsesor.1.devueltas', 1)
             ->where('porAsesor.1.caidas', 1)
             ->where('porConvenio', [
-                ['nombre' => 'Contado', 'ventas' => 2, 'valor' => 1_000_000, 'porFacturar' => 500_000, 'inicial' => 300_000, 'color' => 0],
-                ['nombre' => 'Addi', 'ventas' => 1, 'valor' => 0, 'porFacturar' => 2_000_000, 'inicial' => 0, 'color' => 1],
+                ['nombre' => 'Contado', 'ventas' => 2, 'valor' => 800_000, 'porFacturar' => 400_000, 'color' => 0],
+                ['nombre' => 'Addi', 'ventas' => 1, 'valor' => 0, 'porFacturar' => 2_000_000, 'color' => 1],
             ]),
         );
+});
+
+test('a sale split between convenios counts the value each one covers', function () {
+    $brilla = Convenio::factory()->create(['nombre' => 'Brilla']);
+
+    $venta = Venta::factory()
+        ->for($this->ana, 'asesor')
+        ->hasAttached($brilla, ['valor' => 600_000], 'convenios')
+        ->hasAttached($this->addi, ['valor' => 400_000], 'convenios')
+        ->create(['valor_venta' => 1_000_000, 'estado' => EstadoVenta::Facturada, 'created_at' => '2026-09-17 12:00']);
+
+    $this->actingAs($this->gerente)
+        ->get(route('resumen', ['periodo' => 'hoy']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('porConvenio', [
+                ['nombre' => 'Brilla', 'ventas' => 1, 'valor' => 600_000, 'porFacturar' => 0, 'color' => 2],
+                ['nombre' => 'Addi', 'ventas' => 2, 'valor' => 400_000, 'porFacturar' => 2_000_000, 'color' => 1],
+                ['nombre' => 'Contado', 'ventas' => 1, 'valor' => 0, 'porFacturar' => 400_000, 'color' => 0],
+            ]),
+        );
+
+    expect($venta->convenios)->toHaveCount(2);
 });
 
 test('each convenio keeps its color in any period', function () {

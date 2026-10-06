@@ -62,17 +62,26 @@ function datosDeVenta(array $cambios = []): array
         'cliente_correo' => 'ana.perez@example.com',
         'cliente_direccion' => 'Calle 5 # 10-20',
         'cliente_ciudad' => 'Popayán',
-        'articulo' => 'Televisor',
-        'marca' => 'Samsung',
-        'referencia' => 'UN55',
-        'serial' => 'SN-0001',
-        'valor_venta' => '1250000',
+        'productos' => [
+            ['articulo' => 'Televisor', 'marca' => 'Samsung', 'referencia' => 'UN55', 'serial' => 'SN-0001', 'valor' => '1250000'],
+        ],
         'valor_inicial' => '',
         'forma_pago_inicial' => '',
         'numero_transferencia' => '',
-        'convenio_id' => Convenio::factory()->create()->id,
-        'gasto_administrativo' => '',
+        'convenios' => [
+            ['convenio_id' => Convenio::factory()->create()->id, 'valor' => '1250000', 'gasto_administrativo' => ''],
+        ],
         'observaciones' => '',
         ...$cambios,
     ];
+}
+
+/**
+ * Un convenio para el formulario de venta, con el valor que cubre.
+ *
+ * @return array{convenio_id: int, valor: string, gasto_administrativo: string}
+ */
+function convenioDeVenta(Convenio $convenio, string $valor, string $gasto = ''): array
+{
+    return ['convenio_id' => $convenio->id, 'valor' => $valor, 'gasto_administrativo' => $gasto];
 }

@@ -2,7 +2,9 @@
 
 namespace App\Http\Resources;
 
+use App\Models\ConvenioVenta;
 use App\Models\Venta;
+use App\Models\VentaProducto;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -31,16 +33,25 @@ class VentaPanelResource extends JsonResource
             'cliente_correo' => $this->cliente_correo,
             'cliente_direccion' => $this->cliente_direccion,
             'cliente_ciudad' => $this->cliente_ciudad,
-            'articulo' => $this->articulo,
-            'marca' => $this->marca,
-            'referencia' => $this->referencia,
-            'serial' => $this->serial,
+            'productos_resumen' => $this->resumenProductos(),
+            'serial_resumen' => $this->productos->pluck('serial')->filter()->join(', ') ?: null,
+            'productos' => $this->productos->map(fn (VentaProducto $producto): array => [
+                'id' => $producto->id,
+                'articulo' => $producto->articulo,
+                'marca' => $producto->marca,
+                'referencia' => $producto->referencia,
+                'serial' => $producto->serial,
+                'valor' => $producto->valor,
+            ])->values()->all(),
             'valor_venta' => $this->valor_venta,
             'valor_inicial' => $this->valor_inicial,
             'forma_pago_inicial' => $this->forma_pago_inicial?->etiqueta(),
             'numero_transferencia' => $this->numero_transferencia,
-            'convenio' => $this->convenio->nombre,
-            'gasto_administrativo' => $this->gasto_administrativo,
+            'convenios' => $this->conveniosVenta->map(fn (ConvenioVenta $convenio): array => [
+                'nombre' => $convenio->convenio->nombre,
+                'valor' => $convenio->valor,
+                'gasto_administrativo' => $convenio->gasto_administrativo,
+            ])->values()->all(),
             'observaciones' => $this->observaciones,
             'estado' => $this->estado->value,
             'numero_factura' => $this->numero_factura,

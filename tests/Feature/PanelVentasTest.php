@@ -2,8 +2,10 @@
 
 use App\Enums\EstadoVenta;
 use App\Enums\Rol;
+use App\Models\Convenio;
 use App\Models\User;
 use App\Models\Venta;
+use App\Models\VentaProducto;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -98,11 +100,12 @@ test('the history tab lists every sale and can filter by status', function () {
 });
 
 test('sales can be searched by client, id number, serial or sale number', function (string $busqueda) {
-    $buscada = Venta::factory()->create([
-        'cliente_nombre' => 'Carlos Muñoz',
-        'cliente_cedula' => '1061998877',
-        'serial' => 'SN-ABC-123',
-    ]);
+    $buscada = Venta::factory()
+        ->has(VentaProducto::factory()->count(2)->sequence(['serial' => 'SN-OTRO-999'], ['serial' => 'SN-ABC-123']), 'productos')
+        ->create([
+            'cliente_nombre' => 'Carlos Muñoz',
+            'cliente_cedula' => '1061998877',
+        ]);
     Venta::factory()->create();
 
     $busqueda = str_replace(':consecutivo', $buscada->consecutivo, $busqueda);
@@ -126,6 +129,27 @@ test('admins see the panel without billing permission', function () {
     $this->actingAs($admin)
         ->get(route('panel'))
         ->assertInertia(fn (Assert $page) => $page->where('puedeFacturar', false));
+});
+
+test('the report has one row per product repeating the sale data', function () {
+    $brilla = Convenio::factory()->create(['nombre' => 'Brilla']);
+    $addi = Convenio::factory()->create(['nombre' => 'Addi']);
+
+    Venta::factory()
+        ->has(VentaProducto::factory()->count(2)->sequence(
+            ['articulo' => 'Televisor', 'serial' => 'SN-TV', 'valor' => 1_000_000],
+            ['articulo' => 'Nevera', 'serial' => 'SN-NEV', 'valor' => 800_000],
+        ), 'productos')
+        ->hasAttached($brilla, ['valor' => 900_000], 'convenios')
+        ->hasAttached($addi, ['valor' => 900_000], 'convenios')
+        ->create(['cliente_nombre' => 'Ana Pérez', 'valor_venta' => 1_800_000]);
+
+    $lineas = explode("\n", trim($this->actingAs($this->facturador)->get(route('panel.informe'))->streamedContent()));
+
+    expect($lineas)->toHaveCount(3)
+        ->and($lineas[1])->toContain('"1 de 2";Televisor')->toContain('SN-TV;1000000;1800000')
+        ->and($lineas[2])->toContain('"2 de 2";Nevera')->toContain('SN-NEV;800000;1800000')
+        ->and($lineas[1])->toContain('"Brilla $900.000; Addi $900.000"');
 });
 
 test('the report downloads the filtered sales as an Excel friendly csv', function () {

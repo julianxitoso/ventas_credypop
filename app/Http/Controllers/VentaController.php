@@ -6,10 +6,13 @@ use App\Enums\EstadoVenta;
 use App\Http\Requests\GuardarVentaRequest;
 use App\Http\Requests\MarcarVentaCaidaRequest;
 use App\Models\Convenio;
+use App\Models\ConvenioVenta;
 use App\Models\Venta;
+use App\Models\VentaProducto;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -24,7 +27,7 @@ class VentaController extends Controller
      */
     public function create(Request $request): Response
     {
-        $ventas = $request->user()->ventas()->latest('id');
+        $ventas = $request->user()->ventas()->with('productos')->latest('id');
 
         return Inertia::render('ventas/registrar', [
             'convenios' => $this->conveniosActivos(),
@@ -42,7 +45,14 @@ class VentaController extends Controller
      */
     public function store(GuardarVentaRequest $request): RedirectResponse
     {
-        $venta = $request->user()->ventas()->create($request->datosVenta());
+        $datos = $request->datosVenta();
+
+        $venta = DB::transaction(function () use ($request, $datos): Venta {
+            $venta = $request->user()->ventas()->create($datos['venta']);
+            $venta->guardarDetalle($datos['productos'], $datos['convenios']);
+
+            return $venta;
+        });
 
         return Inertia::flash('ventaRegistrada', $venta->consecutivo)
             ->back();
@@ -55,6 +65,8 @@ class VentaController extends Controller
     {
         Gate::authorize('corregir', $venta);
 
+        $venta->load(['productos', 'conveniosVenta']);
+
         return Inertia::render('ventas/corregir', [
             'convenios' => $this->conveniosActivos(),
             'venta' => [
@@ -62,21 +74,27 @@ class VentaController extends Controller
                 'consecutivo' => $venta->consecutivo,
                 'motivo_devolucion' => $venta->motivo_devolucion,
                 'datos' => [
-                    ...$venta->only([
-                        'cliente_nombre', 'cliente_cedula', 'cliente_celular',
-                        'articulo', 'marca', 'referencia', 'serial',
-                    ]),
+                    ...$venta->only(['cliente_nombre', 'cliente_cedula', 'cliente_celular']),
                     'cliente_telefono' => $venta->cliente_telefono ?? '',
                     'cliente_celular_2' => $venta->cliente_celular_2 ?? '',
                     'cliente_correo' => $venta->cliente_correo ?? '',
                     'cliente_direccion' => $venta->cliente_direccion ?? '',
                     'cliente_ciudad' => $venta->cliente_ciudad ?? '',
-                    'valor_venta' => (string) $venta->valor_venta,
+                    'productos' => $venta->productos->map(fn (VentaProducto $producto): array => [
+                        'articulo' => $producto->articulo,
+                        'marca' => $producto->marca,
+                        'referencia' => $producto->referencia,
+                        'serial' => $producto->serial ?? '',
+                        'valor' => (string) $producto->valor,
+                    ])->values()->all(),
                     'valor_inicial' => (string) $venta->valor_inicial,
                     'forma_pago_inicial' => $venta->forma_pago_inicial->value ?? '',
                     'numero_transferencia' => $venta->numero_transferencia ?? '',
-                    'convenio_id' => (string) $venta->convenio_id,
-                    'gasto_administrativo' => (string) ($venta->gasto_administrativo ?? ''),
+                    'convenios' => $venta->conveniosVenta->map(fn (ConvenioVenta $convenio): array => [
+                        'convenio_id' => (string) $convenio->convenio_id,
+                        'valor' => (string) $convenio->valor,
+                        'gasto_administrativo' => (string) ($convenio->gasto_administrativo ?? ''),
+                    ])->values()->all(),
                     'observaciones' => $venta->observaciones ?? '',
                 ],
             ],
@@ -88,7 +106,9 @@ class VentaController extends Controller
      */
     public function update(GuardarVentaRequest $request, Venta $venta): RedirectResponse
     {
-        if (! $venta->corregir($request->datosVenta())) {
+        $datos = $request->datosVenta();
+
+        if (! $venta->corregir($datos['venta'], $datos['productos'], $datos['convenios'])) {
             $this->avisarYaProcesada();
         }
 
@@ -134,7 +154,7 @@ class VentaController extends Controller
             'consecutivo' => $venta->consecutivo,
             'fecha' => $venta->created_at->format('d/m/Y h:i a'),
             'cliente_nombre' => $venta->cliente_nombre,
-            'articulo' => $venta->articulo,
+            'articulo' => $venta->resumenProductos(),
             'valor_venta' => $venta->valor_venta,
             'estado' => $venta->estado->value,
             'numero_factura' => $venta->numero_factura,

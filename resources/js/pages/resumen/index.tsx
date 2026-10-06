@@ -59,7 +59,6 @@ type FilaConvenio = {
     ventas: number;
     valor: number;
     porFacturar: number;
-    inicial: number;
     /** Posición fija del color del convenio en la paleta (0 a 7). */
     color: number;
 };
@@ -203,7 +202,7 @@ export default function Resumen({
 
                     <Tarjeta
                         titulo="Ventas por convenio"
-                        subtitulo="La gráfica muestra lo vendido (facturado); la tabla agrega lo que está por facturar y la cuota inicial. Sin caídas."
+                        subtitulo="Valor que cubre cada convenio (la cuota inicial va aparte). La gráfica muestra lo vendido (facturado); la tabla agrega lo que está por facturar. Sin caídas."
                         className="xl:col-span-2"
                     >
                         {porConvenio.length === 0 ? (
@@ -464,7 +463,6 @@ function GraficaPorConvenio({ datos }: { datos: FilaConvenio[] }) {
                                     lineas={[
                                         `Vendido: ${formatearPesos(fila.valor)}`,
                                         `Por facturar: ${formatearPesos(fila.porFacturar)}`,
-                                        `Cuota inicial: ${formatearPesos(fila.inicial)}`,
                                         plural(fila.ventas, 'venta', 'ventas'),
                                     ]}
                                 />
@@ -576,7 +574,7 @@ function TablaConvenios({ filas }: { filas: FilaConvenio[] }) {
                             Por facturar
                         </th>
                         <th className="py-2 pl-3 text-right font-medium">
-                            Cuota inicial
+                            Ventas
                         </th>
                     </tr>
                 </thead>
@@ -607,7 +605,7 @@ function TablaConvenios({ filas }: { filas: FilaConvenio[] }) {
                                 {formatearPesos(fila.porFacturar)}
                             </td>
                             <td className="py-2 pl-3 text-right">
-                                {formatearPesos(fila.inicial)}
+                                {fila.ventas}
                             </td>
                         </tr>
                     ))}

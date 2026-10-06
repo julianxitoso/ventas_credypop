@@ -8,11 +8,14 @@ use App\Models\User;
 use App\Models\Venta;
 use Inertia\Testing\AssertableInertia as Assert;
 
+beforeEach(function () {
+    $this->asesor = User::factory()->create();
+});
+
 test('asesores register a pending sale in their own name', function () {
-    $asesor = User::factory()->create();
     $otroAsesor = User::factory()->create();
 
-    $response = $this->actingAs($asesor)
+    $response = $this->actingAs($this->asesor)
         ->from(route('ventas.create'))
         ->post(route('ventas.store'), datosDeVenta(['asesor_id' => $otroAsesor->id]));
 
@@ -21,31 +24,100 @@ test('asesores register a pending sale in their own name', function () {
     $response->assertRedirect(route('ventas.create'))
         ->assertInertiaFlash('ventaRegistrada', $venta->consecutivo);
 
-    expect($venta->asesor_id)->toBe($asesor->id)
+    expect($venta->asesor_id)->toBe($this->asesor->id)
         ->and($venta->refresh()->estado)->toBe(EstadoVenta::Pendiente)
         ->and($venta->valor_venta)->toBe(1_250_000)
         ->and($venta->valor_inicial)->toBe(0)
-        ->and($venta->gasto_administrativo)->toBeNull();
+        ->and($venta->productos)->toHaveCount(1)
+        ->and($venta->convenios)->toHaveCount(1)
+        ->and($venta->convenios->first()->pivot->valor)->toBe(1_250_000)
+        ->and($venta->convenios->first()->pivot->gasto_administrativo)->toBeNull();
 });
 
-test('formatted peso values are stored as whole pesos', function () {
-    $asesor = User::factory()->create();
+test('a sale has several products and its total is their sum', function () {
+    $brilla = Convenio::factory()->create(['nombre' => 'Brilla']);
+    $addi = Convenio::factory()->create(['nombre' => 'Addi']);
 
-    $this->actingAs($asesor)->post(route('ventas.store'), datosDeVenta([
-        'valor_venta' => '$1.250.000',
-        'valor_inicial' => '$250.000',
+    $this->actingAs($this->asesor)->post(route('ventas.store'), datosDeVenta([
+        'productos' => [
+            ['articulo' => 'Televisor', 'marca' => 'Samsung', 'referencia' => 'UN55', 'serial' => '', 'valor' => '$1.000.000'],
+            ['articulo' => 'Nevera', 'marca' => 'LG', 'referencia' => 'GT32', 'serial' => '', 'valor' => '$800.000'],
+        ],
+        'valor_inicial' => '$300.000',
         'forma_pago_inicial' => 'efectivo',
+        'convenios' => [
+            convenioDeVenta($brilla, '$750.000'),
+            convenioDeVenta($addi, '$750.000'),
+        ],
     ]))->assertSessionHasNoErrors();
 
-    expect(Venta::sole())
-        ->valor_venta->toBe(1_250_000)
-        ->valor_inicial->toBe(250_000);
+    $venta = Venta::sole();
+
+    expect($venta->valor_venta)->toBe(1_800_000)
+        ->and($venta->valor_inicial)->toBe(300_000)
+        ->and($venta->productos->pluck('articulo')->all())->toBe(['Televisor', 'Nevera'])
+        ->and($venta->productos->pluck('valor')->all())->toBe([1_000_000, 800_000])
+        ->and($venta->convenios->mapWithKeys(fn ($c) => [$c->nombre => $c->pivot->valor])->all())
+        ->toBe(['Brilla' => 750_000, 'Addi' => 750_000]);
+});
+
+test('the convenios must add up to the total minus the down payment', function () {
+    $brilla = Convenio::factory()->create();
+    $addi = Convenio::factory()->create();
+
+    $this->actingAs($this->asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'valor_inicial' => '250000',
+            'forma_pago_inicial' => 'efectivo',
+            'convenios' => [convenioDeVenta($brilla, '500000'), convenioDeVenta($addi, '400000')],
+        ]))
+        ->assertSessionHasErrors(['convenios' => 'Los convenios deben sumar $1.000.000 (total menos la cuota inicial); faltan $100.000.']);
+
+    $this->actingAs($this->asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'valor_inicial' => '250000',
+            'forma_pago_inicial' => 'efectivo',
+            'convenios' => [convenioDeVenta($brilla, '700000'), convenioDeVenta($addi, '400000')],
+        ]))
+        ->assertSessionHasErrors(['convenios' => 'Los convenios deben sumar $1.000.000 (total menos la cuota inicial); sobran $100.000.']);
+
+    expect(Venta::count())->toBe(0);
+});
+
+test('the same convenio can not be chosen twice', function () {
+    $brilla = Convenio::factory()->create();
+
+    $this->actingAs($this->asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'convenios' => [convenioDeVenta($brilla, '625000'), convenioDeVenta($brilla, '625000')],
+        ]))
+        ->assertSessionHasErrors(['convenios.1.convenio_id' => 'Este convenio está repetido.']);
+});
+
+test('each convenio that requires it demands its administrative expense', function () {
+    $krediya = Convenio::factory()->conGasto()->create();
+    $addi = Convenio::factory()->create();
+
+    $this->actingAs($this->asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'convenios' => [convenioDeVenta($addi, '625000'), convenioDeVenta($krediya, '625000')],
+        ]))
+        ->assertSessionHasErrors(['convenios.1.gasto_administrativo' => 'Este convenio requiere el gasto administrativo.']);
+
+    $this->actingAs($this->asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'convenios' => [convenioDeVenta($addi, '625000', '20000'), convenioDeVenta($krediya, '625000', '45000')],
+        ]))
+        ->assertSessionHasNoErrors();
+
+    $gastos = Venta::sole()->convenios->mapWithKeys(fn ($c) => [$c->id => $c->pivot->gasto_administrativo]);
+
+    expect($gastos[$krediya->id])->toBe(45_000)
+        ->and($gastos[$addi->id])->toBeNull();
 });
 
 test('the client contact details are stored', function () {
-    $asesor = User::factory()->create();
-
-    $this->actingAs($asesor)->post(route('ventas.store'), datosDeVenta([
+    $this->actingAs($this->asesor)->post(route('ventas.store'), datosDeVenta([
         'cliente_celular_2' => '3109876543',
     ]))->assertSessionHasNoErrors();
 
@@ -58,21 +130,19 @@ test('the client contact details are stored', function () {
 });
 
 test('a down payment by transfer requires the transfer number', function () {
-    $asesor = User::factory()->create();
+    $convenio = Convenio::factory()->create();
+    $conInicial = [
+        'valor_inicial' => '200000',
+        'forma_pago_inicial' => 'transferencia',
+        'convenios' => [convenioDeVenta($convenio, '1050000')],
+    ];
 
-    $this->actingAs($asesor)
-        ->post(route('ventas.store'), datosDeVenta([
-            'valor_inicial' => '200000',
-            'forma_pago_inicial' => 'transferencia',
-        ]))
+    $this->actingAs($this->asesor)
+        ->post(route('ventas.store'), datosDeVenta($conInicial))
         ->assertSessionHasErrors(['numero_transferencia' => 'Escribe el número de la transferencia.']);
 
-    $this->actingAs($asesor)
-        ->post(route('ventas.store'), datosDeVenta([
-            'valor_inicial' => '200000',
-            'forma_pago_inicial' => 'transferencia',
-            'numero_transferencia' => 'TRF-998877',
-        ]))
+    $this->actingAs($this->asesor)
+        ->post(route('ventas.store'), datosDeVenta([...$conInicial, 'numero_transferencia' => 'TRF-998877']))
         ->assertSessionHasNoErrors();
 
     expect(Venta::sole())
@@ -81,13 +151,14 @@ test('a down payment by transfer requires the transfer number', function () {
 });
 
 test('a down payment in cash does not keep a transfer number', function () {
-    $asesor = User::factory()->create();
+    $convenio = Convenio::factory()->create();
 
-    $this->actingAs($asesor)
+    $this->actingAs($this->asesor)
         ->post(route('ventas.store'), datosDeVenta([
             'valor_inicial' => '200000',
             'forma_pago_inicial' => 'efectivo',
             'numero_transferencia' => 'TRF-1',
+            'convenios' => [convenioDeVenta($convenio, '1050000')],
         ]))
         ->assertSessionHasNoErrors();
 
@@ -97,9 +168,7 @@ test('a down payment in cash does not keep a transfer number', function () {
 });
 
 test('without a down payment the payment method is not asked nor kept', function () {
-    $asesor = User::factory()->create();
-
-    $this->actingAs($asesor)
+    $this->actingAs($this->asesor)
         ->post(route('ventas.store'), datosDeVenta([
             'valor_inicial' => '0',
             'forma_pago_inicial' => 'transferencia',
@@ -112,48 +181,21 @@ test('without a down payment the payment method is not asked nor kept', function
         ->numero_transferencia->toBeNull();
 });
 
-test('a convenio that requires it demands the administrative expense', function () {
-    $asesor = User::factory()->create();
-    $krediya = Convenio::factory()->conGasto()->create();
-
-    $this->actingAs($asesor)
-        ->post(route('ventas.store'), datosDeVenta(['convenio_id' => $krediya->id]))
-        ->assertSessionHasErrors(['gasto_administrativo' => 'Este convenio requiere el gasto administrativo.']);
-
-    $this->actingAs($asesor)
-        ->post(route('ventas.store'), datosDeVenta([
-            'convenio_id' => $krediya->id,
-            'gasto_administrativo' => '45000',
-        ]))
-        ->assertSessionHasNoErrors();
-
-    expect(Venta::sole()->gasto_administrativo)->toBe(45_000);
-});
-
-test('the administrative expense is discarded when the convenio does not require it', function () {
-    $asesor = User::factory()->create();
-
-    $this->actingAs($asesor)
-        ->post(route('ventas.store'), datosDeVenta(['gasto_administrativo' => '45000']))
-        ->assertSessionHasNoErrors();
-
-    expect(Venta::sole()->gasto_administrativo)->toBeNull();
-});
-
 test('the sale is rejected when the data is invalid', function (array $cambios, string $campo) {
-    $asesor = User::factory()->create();
-
-    $this->actingAs($asesor)
+    $this->actingAs($this->asesor)
         ->post(route('ventas.store'), datosDeVenta($cambios))
         ->assertSessionHasErrors($campo);
 
     expect(Venta::count())->toBe(0);
 })->with([
-    'inicial mayor que la venta' => [['valor_venta' => '1000000', 'valor_inicial' => '1000001'], 'valor_inicial'],
+    'inicial mayor que el total' => [['valor_inicial' => '1250001', 'forma_pago_inicial' => 'efectivo'], 'valor_inicial'],
+    'sin productos' => [['productos' => []], 'productos'],
+    'producto sin artículo' => [['productos' => [['articulo' => '', 'marca' => 'LG', 'referencia' => 'X', 'serial' => '', 'valor' => '100']]], 'productos.0.articulo'],
+    'producto en cero' => [['productos' => [['articulo' => 'TV', 'marca' => 'LG', 'referencia' => 'X', 'serial' => '', 'valor' => '0']]], 'productos.0.valor'],
+    'sin convenios' => [['convenios' => []], 'convenios'],
+    'convenio inactivo' => [fn () => ['convenios' => [convenioDeVenta(Convenio::factory()->inactivo()->create(), '1250000')]], 'convenios.0.convenio_id'],
     'celular sin 10 dígitos' => [['cliente_celular' => '300123'], 'cliente_celular'],
     'cédula con letras' => [['cliente_cedula' => '10A2345'], 'cliente_cedula'],
-    'valor de venta en cero' => [['valor_venta' => '0'], 'valor_venta'],
-    'convenio inactivo' => [fn () => ['convenio_id' => Convenio::factory()->inactivo()->create()->id], 'convenio_id'],
     'sin teléfono' => [['cliente_telefono' => ''], 'cliente_telefono'],
     'teléfono muy corto' => [['cliente_telefono' => '12345'], 'cliente_telefono'],
     'otro celular sin 10 dígitos' => [['cliente_celular_2' => '31012'], 'cliente_celular_2'],
@@ -166,12 +208,11 @@ test('the sale is rejected when the data is invalid', function (array $cambios, 
 ]);
 
 test('asesores only see their own recent sales and active convenios', function () {
-    $asesor = User::factory()->create();
-    $propia = Venta::factory()->for($asesor, 'asesor')->create();
+    $propia = Venta::factory()->for($this->asesor, 'asesor')->create();
     Venta::factory()->create();
     Convenio::factory()->inactivo()->create();
 
-    $this->actingAs($asesor)
+    $this->actingAs($this->asesor)
         ->get(route('ventas.create'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('ventas/registrar')

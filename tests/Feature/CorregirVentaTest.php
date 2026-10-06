@@ -2,6 +2,7 @@
 
 use App\Enums\EstadoVenta;
 use App\Enums\Rol;
+use App\Models\Convenio;
 use App\Models\User;
 use App\Models\Venta;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -35,21 +36,35 @@ test('asesores open the correction form with the sale data', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('ventas/corregir')
             ->where('venta.motivo_devolucion', 'El serial no coincide.')
-            ->where('venta.datos.serial', $this->venta->serial)
-            ->where('venta.datos.valor_venta', '1250000'),
+            ->has('venta.datos.productos', 1)
+            ->where('venta.datos.productos.0.serial', $this->venta->productos->first()->serial)
+            ->where('venta.datos.productos.0.valor', '1250000')
+            ->has('venta.datos.convenios', 1)
+            ->where('venta.datos.convenios.0.valor', '1250000'),
         );
 });
 
-test('a corrected sale goes back to billing as pending', function () {
+test('a corrected sale goes back to billing as pending with its new products and convenios', function () {
+    $brilla = Convenio::factory()->create();
+    $addi = Convenio::factory()->create();
+
     $this->actingAs($this->asesor)
-        ->put(route('ventas.update', $this->venta), datosDeVenta(['serial' => 'SN-CORREGIDO']))
+        ->put(route('ventas.update', $this->venta), datosDeVenta([
+            'productos' => [
+                ['articulo' => 'Televisor', 'marca' => 'Samsung', 'referencia' => 'UN55', 'serial' => 'SN-CORREGIDO', 'valor' => '1000000'],
+                ['articulo' => 'Soporte', 'marca' => 'Genérico', 'referencia' => 'S1', 'serial' => '', 'valor' => '100000'],
+            ],
+            'convenios' => [convenioDeVenta($brilla, '600000'), convenioDeVenta($addi, '500000')],
+        ]))
         ->assertRedirect(route('ventas.create'))
         ->assertInertiaFlash('toast.type', 'success');
 
     $this->venta->refresh();
 
     expect($this->venta->estado)->toBe(EstadoVenta::Pendiente)
-        ->and($this->venta->serial)->toBe('SN-CORREGIDO')
+        ->and($this->venta->valor_venta)->toBe(1_100_000)
+        ->and($this->venta->productos->pluck('serial')->all())->toBe(['SN-CORREGIDO', null])
+        ->and($this->venta->convenios->pluck('id')->all())->toBe([$brilla->id, $addi->id])
         ->and($this->venta->asesor_id)->toBe($this->asesor->id)
         ->and($this->venta->corregida_en)->not->toBeNull()
         ->and($this->venta->motivo_devolucion)->toBe('El serial no coincide.');

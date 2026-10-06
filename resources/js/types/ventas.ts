@@ -6,6 +6,22 @@ export type Convenio = {
     requiere_gasto: boolean;
 };
 
+export type ProductoVenta = {
+    id: number;
+    articulo: string;
+    marca: string;
+    referencia: string;
+    serial: string | null;
+    valor: number;
+};
+
+export type ConvenioVenta = {
+    nombre: string;
+    /** Valor que cubre el convenio en esta venta. */
+    valor: number;
+    gasto_administrativo: number | null;
+};
+
 export type VentaPanel = {
     id: number;
     consecutivo: string;
@@ -19,17 +35,18 @@ export type VentaPanel = {
     cliente_correo: string | null;
     cliente_direccion: string | null;
     cliente_ciudad: string | null;
-    articulo: string;
-    marca: string;
-    referencia: string;
-    serial: string;
+    /** "Televisor (+2 más)". */
+    productos_resumen: string;
+    /** Series de los productos separadas por coma, o null si ninguno tiene. */
+    serial_resumen: string | null;
+    productos: ProductoVenta[];
+    /** Total de la venta: suma de los productos. */
     valor_venta: number;
     valor_inicial: number;
     /** Etiqueta legible ("Efectivo", "Transferencia electrónica") o null si no hubo inicial. */
     forma_pago_inicial: string | null;
     numero_transferencia: string | null;
-    convenio: string;
-    gasto_administrativo: number | null;
+    convenios: ConvenioVenta[];
     observaciones: string | null;
     estado: EstadoVenta;
     numero_factura: string | null;

@@ -7,7 +7,7 @@ use Database\Factories\ConvenioFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * @property int $id
@@ -37,11 +37,16 @@ class Convenio extends Model
     }
 
     /**
-     * @return HasMany<Venta, $this>
+     * Ventas en las que participa el convenio (con el valor que cubre en cada una).
+     *
+     * @return BelongsToMany<Venta, $this, ConvenioVenta, 'pivot'>
      */
-    public function ventas(): HasMany
+    public function ventas(): BelongsToMany
     {
-        return $this->hasMany(Venta::class);
+        return $this->belongsToMany(Venta::class)
+            ->using(ConvenioVenta::class)
+            ->withPivot(['id', 'valor', 'gasto_administrativo'])
+            ->withTimestamps();
     }
 
     /**
