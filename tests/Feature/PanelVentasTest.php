@@ -147,6 +147,8 @@ test('the report downloads the filtered sales as an Excel friendly csv', functio
     expect($csv)->toStartWith("\xEF\xBB\xBF")
         ->and($lineas)->toHaveCount(2)
         ->and($lineas[0])->toContain('Venta;Fecha;Asesor')
+        ->and($lineas[0])->toContain('Teléfono;"Otro celular";Correo;Dirección;Ciudad')
+        ->and($lineas[0])->toContain('"Valor inicial";"Pago inicial";"Número transferencia"')
         ->and($lineas[1])->toContain('Ana Pérez')
         ->and($lineas[1])->toContain(';Devuelta;')
         ->and($lineas[1])->toContain("'=HYPERLINK")

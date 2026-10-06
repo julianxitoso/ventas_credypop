@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoVenta;
+use App\Enums\FormaPagoInicial;
 use Carbon\CarbonImmutable;
 use Database\Factories\VentaFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,13 +19,19 @@ use Illuminate\Support\Arr;
  * @property string $cliente_nombre
  * @property string $cliente_cedula
  * @property string $cliente_celular
+ * @property string|null $cliente_telefono
+ * @property string|null $cliente_celular_2
  * @property string|null $cliente_correo
+ * @property string|null $cliente_direccion
+ * @property string|null $cliente_ciudad
  * @property string $articulo
  * @property string $marca
  * @property string $referencia
  * @property string $serial
  * @property int $valor_venta
  * @property int $valor_inicial
+ * @property FormaPagoInicial|null $forma_pago_inicial
+ * @property string|null $numero_transferencia
  * @property int $convenio_id
  * @property int|null $gasto_administrativo
  * @property string|null $observaciones
@@ -57,9 +64,11 @@ class Venta extends Model
     // se cambian con acciones del facturador, nunca desde el formulario.
     protected $fillable = [
         'asesor_id',
-        'cliente_nombre', 'cliente_cedula', 'cliente_celular', 'cliente_correo',
+        'cliente_nombre', 'cliente_cedula', 'cliente_celular', 'cliente_telefono', 'cliente_celular_2',
+        'cliente_correo', 'cliente_direccion', 'cliente_ciudad',
         'articulo', 'marca', 'referencia', 'serial',
-        'valor_venta', 'valor_inicial', 'convenio_id', 'gasto_administrativo',
+        'valor_venta', 'valor_inicial', 'forma_pago_inicial', 'numero_transferencia',
+        'convenio_id', 'gasto_administrativo',
         'observaciones',
     ];
 
@@ -67,6 +76,7 @@ class Venta extends Model
     {
         return [
             'estado' => EstadoVenta::class,
+            'forma_pago_inicial' => FormaPagoInicial::class,
             'valor_venta' => 'integer',
             'valor_inicial' => 'integer',
             'gasto_administrativo' => 'integer',

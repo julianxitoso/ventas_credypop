@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\FormaPagoInicial;
 use App\Models\Convenio;
 use App\Models\Venta;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -57,13 +58,29 @@ class GuardarVentaRequest extends FormRequest
             'cliente_nombre' => ['required', 'string', 'max:150'],
             'cliente_cedula' => ['required', 'digits_between:5,12'],
             'cliente_celular' => ['required', 'digits:10'],
-            'cliente_correo' => ['nullable', 'email', 'max:150'],
+            'cliente_telefono' => ['required', 'digits_between:7,10'],
+            'cliente_celular_2' => ['nullable', 'digits:10'],
+            'cliente_correo' => ['required', 'email', 'max:150'],
+            'cliente_direccion' => ['required', 'string', 'max:200'],
+            'cliente_ciudad' => ['required', 'string', 'max:100'],
             'articulo' => ['required', 'string', 'max:150'],
             'marca' => ['required', 'string', 'max:80'],
             'referencia' => ['required', 'string', 'max:80'],
             'serial' => ['required', 'string', 'max:100'],
             'valor_venta' => ['required', 'integer', 'min:1'],
             'valor_inicial' => ['required', 'integer', 'min:0', 'lte:valor_venta'],
+            'forma_pago_inicial' => [
+                Rule::requiredIf(fn (): bool => $this->hayInicial()),
+                'nullable',
+                Rule::enum(FormaPagoInicial::class),
+            ],
+            'numero_transferencia' => [
+                Rule::requiredIf(fn (): bool => $this->hayInicial()
+                    && $this->input('forma_pago_inicial') === FormaPagoInicial::Transferencia->value),
+                'nullable',
+                'string',
+                'max:50',
+            ],
             'convenio_id' => ['required', 'integer', Rule::exists('convenios', 'id')->where('activo', true)],
             'gasto_administrativo' => [
                 Rule::requiredIf(fn (): bool => $this->convenio()->requiere_gasto ?? false),
@@ -83,11 +100,15 @@ class GuardarVentaRequest extends FormRequest
         return [
             'valor_inicial.lte' => 'El valor de inicial no puede ser mayor que el valor de venta.',
             'gasto_administrativo.required' => 'Este convenio requiere el gasto administrativo.',
+            'forma_pago_inicial.required' => 'Indica si la cuota inicial se pagó en efectivo o por transferencia.',
+            'numero_transferencia.required' => 'Escribe el número de la transferencia.',
         ];
     }
 
     /**
-     * Datos listos para guardar: el gasto solo se conserva si el convenio lo requiere.
+     * Datos listos para guardar: el gasto solo se conserva si el convenio lo
+     * requiere, y la forma de pago solo si hay cuota inicial (el número de
+     * transferencia, solo si se pagó por transferencia).
      *
      * @return array<string, mixed>
      */
@@ -99,7 +120,18 @@ class GuardarVentaRequest extends FormRequest
             $datos['gasto_administrativo'] = null;
         }
 
+        $datos['forma_pago_inicial'] = $this->hayInicial() ? ($datos['forma_pago_inicial'] ?? null) : null;
+
+        $datos['numero_transferencia'] = $datos['forma_pago_inicial'] === FormaPagoInicial::Transferencia->value
+            ? ($datos['numero_transferencia'] ?? null)
+            : null;
+
         return $datos;
+    }
+
+    private function hayInicial(): bool
+    {
+        return (int) $this->input('valor_inicial') > 0;
     }
 
     private function convenio(): ?Convenio

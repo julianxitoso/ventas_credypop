@@ -20,13 +20,19 @@ export const ventaVacia = {
     cliente_nombre: '',
     cliente_cedula: '',
     cliente_celular: '',
+    cliente_telefono: '',
+    cliente_celular_2: '',
     cliente_correo: '',
+    cliente_direccion: '',
+    cliente_ciudad: '',
     articulo: '',
     marca: '',
     referencia: '',
     serial: '',
     valor_venta: '',
     valor_inicial: '',
+    forma_pago_inicial: '',
+    numero_transferencia: '',
     convenio_id: '',
     gasto_administrativo: '',
     observaciones: '',
@@ -56,6 +62,7 @@ export default function FormularioVenta({
 
     const convenio = convenios.find((c) => String(c.id) === data.convenio_id);
     const requiereGasto = convenio?.requiere_gasto ?? false;
+    const hayInicial = Number(data.valor_inicial) > 0;
 
     function campoTexto(
         campo: CampoVenta,
@@ -94,11 +101,37 @@ export default function FormularioVenta({
                         maxLength: 10,
                         placeholder: '3001234567',
                     })}
+                    {campoTexto('cliente_telefono', 'Teléfono', {
+                        required: true,
+                        inputMode: 'numeric',
+                        maxLength: 10,
+                        placeholder: 'Fijo o celular',
+                    })}
+                    {campoTexto(
+                        'cliente_celular_2',
+                        'Otro celular (opcional)',
+                        {
+                            inputMode: 'numeric',
+                            maxLength: 10,
+                        },
+                    )}
                 </div>
-                {campoTexto('cliente_correo', 'Correo (opcional)', {
+                {campoTexto('cliente_correo', 'Correo', {
+                    required: true,
                     type: 'email',
                     autoComplete: 'off',
                 })}
+                <div className="grid gap-4 sm:grid-cols-2">
+                    {campoTexto('cliente_direccion', 'Dirección', {
+                        required: true,
+                        maxLength: 200,
+                        autoComplete: 'off',
+                    })}
+                    {campoTexto('cliente_ciudad', 'Ciudad', {
+                        required: true,
+                        maxLength: 100,
+                    })}
+                </div>
             </Seccion>
 
             <Seccion titulo="Artículo">
@@ -135,11 +168,71 @@ export default function FormularioVenta({
                             id="valor_inicial"
                             placeholder="$0"
                             value={data.valor_inicial}
-                            onValueChange={(v) => setData('valor_inicial', v)}
+                            onValueChange={(v) =>
+                                setData((actual) =>
+                                    Number(v) > 0
+                                        ? { ...actual, valor_inicial: v }
+                                        : {
+                                              ...actual,
+                                              valor_inicial: v,
+                                              forma_pago_inicial: '',
+                                              numero_transferencia: '',
+                                          },
+                                )
+                            }
                             aria-invalid={Boolean(errors.valor_inicial)}
                         />
                     </Campo>
                 </div>
+
+                {hayInicial && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Campo
+                            id="forma_pago_inicial"
+                            etiqueta="¿Cómo pagó la cuota inicial?"
+                            error={errors.forma_pago_inicial}
+                        >
+                            <Select
+                                value={data.forma_pago_inicial}
+                                onValueChange={(v) =>
+                                    setData((actual) => ({
+                                        ...actual,
+                                        forma_pago_inicial: v,
+                                        numero_transferencia:
+                                            v === 'transferencia'
+                                                ? actual.numero_transferencia
+                                                : '',
+                                    }))
+                                }
+                            >
+                                <SelectTrigger
+                                    id="forma_pago_inicial"
+                                    className="w-full"
+                                    aria-invalid={Boolean(
+                                        errors.forma_pago_inicial,
+                                    )}
+                                >
+                                    <SelectValue placeholder="Selecciona la forma de pago" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="efectivo">
+                                        Efectivo
+                                    </SelectItem>
+                                    <SelectItem value="transferencia">
+                                        Transferencia electrónica
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </Campo>
+
+                        {data.forma_pago_inicial === 'transferencia' &&
+                            campoTexto(
+                                'numero_transferencia',
+                                'Número de transferencia',
+                                { required: true, maxLength: 50 },
+                            )}
+                    </div>
+                )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Campo

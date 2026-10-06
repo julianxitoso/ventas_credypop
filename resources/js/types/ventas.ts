@@ -14,13 +14,20 @@ export type VentaPanel = {
     cliente_nombre: string;
     cliente_cedula: string;
     cliente_celular: string;
+    cliente_telefono: string | null;
+    cliente_celular_2: string | null;
     cliente_correo: string | null;
+    cliente_direccion: string | null;
+    cliente_ciudad: string | null;
     articulo: string;
     marca: string;
     referencia: string;
     serial: string;
     valor_venta: number;
     valor_inicial: number;
+    /** Etiqueta legible ("Efectivo", "Transferencia electrónica") o null si no hubo inicial. */
+    forma_pago_inicial: string | null;
+    numero_transferencia: string | null;
     convenio: string;
     gasto_administrativo: number | null;
     observaciones: string | null;

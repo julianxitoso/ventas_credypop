@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\EstadoVenta;
+use App\Enums\FormaPagoInicial;
 use App\Enums\Rol;
 use App\Models\Convenio;
 use App\Models\User;
@@ -33,11 +34,82 @@ test('formatted peso values are stored as whole pesos', function () {
     $this->actingAs($asesor)->post(route('ventas.store'), datosDeVenta([
         'valor_venta' => '$1.250.000',
         'valor_inicial' => '$250.000',
+        'forma_pago_inicial' => 'efectivo',
     ]))->assertSessionHasNoErrors();
 
     expect(Venta::sole())
         ->valor_venta->toBe(1_250_000)
         ->valor_inicial->toBe(250_000);
+});
+
+test('the client contact details are stored', function () {
+    $asesor = User::factory()->create();
+
+    $this->actingAs($asesor)->post(route('ventas.store'), datosDeVenta([
+        'cliente_celular_2' => '3109876543',
+    ]))->assertSessionHasNoErrors();
+
+    expect(Venta::sole())
+        ->cliente_telefono->toBe('6028201234')
+        ->cliente_celular_2->toBe('3109876543')
+        ->cliente_correo->toBe('ana.perez@example.com')
+        ->cliente_direccion->toBe('Calle 5 # 10-20')
+        ->cliente_ciudad->toBe('Popayán');
+});
+
+test('a down payment by transfer requires the transfer number', function () {
+    $asesor = User::factory()->create();
+
+    $this->actingAs($asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'valor_inicial' => '200000',
+            'forma_pago_inicial' => 'transferencia',
+        ]))
+        ->assertSessionHasErrors(['numero_transferencia' => 'Escribe el número de la transferencia.']);
+
+    $this->actingAs($asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'valor_inicial' => '200000',
+            'forma_pago_inicial' => 'transferencia',
+            'numero_transferencia' => 'TRF-998877',
+        ]))
+        ->assertSessionHasNoErrors();
+
+    expect(Venta::sole())
+        ->forma_pago_inicial->toBe(FormaPagoInicial::Transferencia)
+        ->numero_transferencia->toBe('TRF-998877');
+});
+
+test('a down payment in cash does not keep a transfer number', function () {
+    $asesor = User::factory()->create();
+
+    $this->actingAs($asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'valor_inicial' => '200000',
+            'forma_pago_inicial' => 'efectivo',
+            'numero_transferencia' => 'TRF-1',
+        ]))
+        ->assertSessionHasNoErrors();
+
+    expect(Venta::sole())
+        ->forma_pago_inicial->toBe(FormaPagoInicial::Efectivo)
+        ->numero_transferencia->toBeNull();
+});
+
+test('without a down payment the payment method is not asked nor kept', function () {
+    $asesor = User::factory()->create();
+
+    $this->actingAs($asesor)
+        ->post(route('ventas.store'), datosDeVenta([
+            'valor_inicial' => '0',
+            'forma_pago_inicial' => 'transferencia',
+            'numero_transferencia' => 'TRF-1',
+        ]))
+        ->assertSessionHasNoErrors();
+
+    expect(Venta::sole())
+        ->forma_pago_inicial->toBeNull()
+        ->numero_transferencia->toBeNull();
 });
 
 test('a convenio that requires it demands the administrative expense', function () {
@@ -82,6 +154,15 @@ test('the sale is rejected when the data is invalid', function (array $cambios, 
     'cédula con letras' => [['cliente_cedula' => '10A2345'], 'cliente_cedula'],
     'valor de venta en cero' => [['valor_venta' => '0'], 'valor_venta'],
     'convenio inactivo' => [fn () => ['convenio_id' => Convenio::factory()->inactivo()->create()->id], 'convenio_id'],
+    'sin teléfono' => [['cliente_telefono' => ''], 'cliente_telefono'],
+    'teléfono muy corto' => [['cliente_telefono' => '12345'], 'cliente_telefono'],
+    'otro celular sin 10 dígitos' => [['cliente_celular_2' => '31012'], 'cliente_celular_2'],
+    'sin correo' => [['cliente_correo' => ''], 'cliente_correo'],
+    'correo inválido' => [['cliente_correo' => 'no-es-correo'], 'cliente_correo'],
+    'sin dirección' => [['cliente_direccion' => ''], 'cliente_direccion'],
+    'sin ciudad' => [['cliente_ciudad' => ''], 'cliente_ciudad'],
+    'inicial sin forma de pago' => [['valor_inicial' => '100000'], 'forma_pago_inicial'],
+    'forma de pago inventada' => [['valor_inicial' => '100000', 'forma_pago_inicial' => 'cheque'], 'forma_pago_inicial'],
 ]);
 
 test('asesores only see their own recent sales and active convenios', function () {

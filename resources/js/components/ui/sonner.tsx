@@ -17,6 +17,9 @@ function Toaster({ ...props }: ToasterProps) {
                     '--normal-bg': 'var(--popover)',
                     '--normal-text': 'var(--popover-foreground)',
                     '--normal-border': 'var(--border)',
+                    // Debajo de las ventanas (z-50) para que un aviso que se queda
+                    // abierto nunca tape los botones de una ventana de detalle.
+                    zIndex: 40,
                 } as React.CSSProperties
             }
             {...props}

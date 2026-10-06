@@ -38,7 +38,9 @@ export default function DetalleVentaDialog({
             open={venta !== null}
             onOpenChange={(open) => !open && onClose()}
         >
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            {/* Encabezado y acciones fijos; solo los datos se desplazan, para que
+                FACTURAR y DEVOLVER se vean siempre, aunque la pantalla sea baja. */}
+            <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
                 {venta && (
                     <ContenidoDetalle
                         key={venta.id}
@@ -87,7 +89,7 @@ function ContenidoDetalle({
 
     return (
         <>
-            <DialogHeader>
+            <DialogHeader className="border-b px-6 pt-6 pr-12 pb-4">
                 <div className="flex flex-wrap items-center gap-3">
                     <DialogTitle>VENTA #{venta.consecutivo}</DialogTitle>
                     <EstadoVentaBadge estado={venta.estado} />
@@ -97,7 +99,7 @@ function ContenidoDetalle({
                 </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-5 text-sm">
+            <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto px-6 py-4 text-sm">
                 {venta.estado === 'pendiente' && venta.corregida_en && (
                     <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
                         <p className="font-medium">
@@ -115,7 +117,19 @@ function ContenidoDetalle({
                     <Dato etiqueta="Nombres">{venta.cliente_nombre}</Dato>
                     <Dato etiqueta="Cédula">{venta.cliente_cedula}</Dato>
                     <Dato etiqueta="Celular">{venta.cliente_celular}</Dato>
+                    <Dato etiqueta="Teléfono">
+                        {venta.cliente_telefono || '—'}
+                    </Dato>
+                    {venta.cliente_celular_2 && (
+                        <Dato etiqueta="Otro celular">
+                            {venta.cliente_celular_2}
+                        </Dato>
+                    )}
                     <Dato etiqueta="Correo">{venta.cliente_correo || '—'}</Dato>
+                    <Dato etiqueta="Dirección">
+                        {venta.cliente_direccion || '—'}
+                    </Dato>
+                    <Dato etiqueta="Ciudad">{venta.cliente_ciudad || '—'}</Dato>
                 </Grupo>
 
                 <Grupo titulo="Artículo">
@@ -132,6 +146,13 @@ function ContenidoDetalle({
                     <Dato etiqueta="Valor de inicial">
                         {formatearPesos(venta.valor_inicial)}
                     </Dato>
+                    {venta.forma_pago_inicial && (
+                        <Dato etiqueta="Pago de la inicial">
+                            {venta.forma_pago_inicial}
+                            {venta.numero_transferencia &&
+                                ` · N.º ${venta.numero_transferencia}`}
+                        </Dato>
+                    )}
                     <Dato etiqueta="Convenio">{venta.convenio}</Dato>
                     {venta.gasto_administrativo !== null && (
                         <Dato etiqueta="Gasto administrativo">
@@ -182,124 +203,141 @@ function ContenidoDetalle({
                 )}
             </div>
 
-            {puedeProcesar && accion === 'detalle' && (
-                <DialogFooter>
-                    <Button
-                        variant="destructive"
-                        onClick={() => setAccion('devolver')}
-                    >
-                        DEVOLVER / CORREGIR
-                    </Button>
-                    <Button
-                        className="bg-green-600 text-white hover:bg-green-700"
-                        onClick={() => setAccion('facturar')}
-                    >
-                        FACTURAR
-                    </Button>
-                </DialogFooter>
-            )}
+            {puedeProcesar && (
+                <div className="border-t bg-background px-6 py-4">
+                    {accion === 'detalle' && (
+                        <DialogFooter>
+                            <Button
+                                variant="destructive"
+                                onClick={() => setAccion('devolver')}
+                            >
+                                DEVOLVER / CORREGIR
+                            </Button>
+                            <Button
+                                className="bg-green-600 text-white hover:bg-green-700"
+                                onClick={() => setAccion('facturar')}
+                            >
+                                FACTURAR
+                            </Button>
+                        </DialogFooter>
+                    )}
 
-            {puedeProcesar && accion === 'facturar' && (
-                <form
-                    onSubmit={confirmarFacturacion}
-                    className="grid gap-3 rounded-lg border p-4"
-                >
-                    <Label htmlFor="numero_factura">
-                        Número de factura del ERP
-                    </Label>
-                    <Input
-                        id="numero_factura"
-                        autoFocus
-                        required
-                        maxLength={50}
-                        value={formFactura.data.numero_factura}
-                        onChange={(e) =>
-                            formFactura.setData(
-                                'numero_factura',
-                                e.target.value,
-                            )
-                        }
-                        aria-invalid={Boolean(
-                            formFactura.errors.numero_factura,
-                        )}
-                    />
-                    <InputError message={formFactura.errors.numero_factura} />
-                    <InputError
-                        message={
-                            (formFactura.errors as Record<string, string>).venta
-                        }
-                    />
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setAccion('detalle')}
+                    {accion === 'facturar' && (
+                        <form
+                            onSubmit={confirmarFacturacion}
+                            className="grid gap-3"
                         >
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={formFactura.processing}
-                            className="bg-green-600 text-white hover:bg-green-700"
-                        >
-                            {formFactura.processing && <Spinner />}
-                            CONFIRMAR FACTURACIÓN
-                        </Button>
-                    </DialogFooter>
-                </form>
-            )}
+                            <Label htmlFor="numero_factura">
+                                Número de factura del ERP
+                            </Label>
+                            <Input
+                                id="numero_factura"
+                                autoFocus
+                                required
+                                maxLength={50}
+                                value={formFactura.data.numero_factura}
+                                onChange={(e) =>
+                                    formFactura.setData(
+                                        'numero_factura',
+                                        e.target.value,
+                                    )
+                                }
+                                aria-invalid={Boolean(
+                                    formFactura.errors.numero_factura,
+                                )}
+                            />
+                            <InputError
+                                message={formFactura.errors.numero_factura}
+                            />
+                            <InputError
+                                message={
+                                    (
+                                        formFactura.errors as Record<
+                                            string,
+                                            string
+                                        >
+                                    ).venta
+                                }
+                            />
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setAccion('detalle')}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={formFactura.processing}
+                                    className="bg-green-600 text-white hover:bg-green-700"
+                                >
+                                    {formFactura.processing && <Spinner />}
+                                    CONFIRMAR FACTURACIÓN
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    )}
 
-            {puedeProcesar && accion === 'devolver' && (
-                <form
-                    onSubmit={confirmarDevolucion}
-                    className="grid gap-3 rounded-lg border p-4"
-                >
-                    <Label htmlFor="motivo_devolucion">
-                        Motivo de la devolución
-                    </Label>
-                    <textarea
-                        id="motivo_devolucion"
-                        autoFocus
-                        required
-                        rows={3}
-                        maxLength={1000}
-                        value={formDevolucion.data.motivo_devolucion}
-                        onChange={(e) =>
-                            formDevolucion.setData(
-                                'motivo_devolucion',
-                                e.target.value,
-                            )
-                        }
-                        placeholder="Ej. El serial no coincide con la factura del proveedor"
-                        className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
-                    />
-                    <InputError
-                        message={formDevolucion.errors.motivo_devolucion}
-                    />
-                    <InputError
-                        message={
-                            (formDevolucion.errors as Record<string, string>)
-                                .venta
-                        }
-                    />
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setAccion('detalle')}
+                    {accion === 'devolver' && (
+                        <form
+                            onSubmit={confirmarDevolucion}
+                            className="grid gap-3"
                         >
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="destructive"
-                            disabled={formDevolucion.processing}
-                        >
-                            {formDevolucion.processing && <Spinner />}
-                            CONFIRMAR DEVOLUCIÓN
-                        </Button>
-                    </DialogFooter>
-                </form>
+                            <Label htmlFor="motivo_devolucion">
+                                Motivo de la devolución
+                            </Label>
+                            <textarea
+                                id="motivo_devolucion"
+                                autoFocus
+                                required
+                                rows={3}
+                                maxLength={1000}
+                                value={formDevolucion.data.motivo_devolucion}
+                                onChange={(e) =>
+                                    formDevolucion.setData(
+                                        'motivo_devolucion',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="Ej. El serial no coincide con la factura del proveedor"
+                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+                            />
+                            <InputError
+                                message={
+                                    formDevolucion.errors.motivo_devolucion
+                                }
+                            />
+                            <InputError
+                                message={
+                                    (
+                                        formDevolucion.errors as Record<
+                                            string,
+                                            string
+                                        >
+                                    ).venta
+                                }
+                            />
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setAccion('detalle')}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    variant="destructive"
+                                    disabled={formDevolucion.processing}
+                                >
+                                    {formDevolucion.processing && <Spinner />}
+                                    CONFIRMAR DEVOLUCIÓN
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    )}
+                </div>
             )}
         </>
     );
