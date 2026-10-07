@@ -50,6 +50,7 @@ use Illuminate\Support\Facades\DB;
  * @property bool $devolucion_por_otros
  * @property bool $revisar_serie Bodega debe revisar las series aunque ya estén puestas.
  * @property CarbonImmutable|null $corregida_en
+ * @property string|null $nota_correccion
  * @property string|null $motivo_caida
  * @property CarbonImmutable|null $caida_en
  * @property CarbonImmutable $created_at
@@ -364,15 +365,16 @@ class Venta extends Model
      * El asesor corrige una venta que le devolvieron (datos, productos y
      * convenios). Si todos los productos conservan su serie y no hay que
      * revisarla, vuelve directo al facturador; si no, pasa por bodega.
-     * Se conserva el último motivo de devolución. Todo o nada.
+     * Se conserva el último motivo de devolución junto con la nota del asesor
+     * sobre lo que corrigió. Todo o nada.
      *
      * @param  array<string, mixed>  $datos
      * @param  list<array{id?: int|null, articulo: string, marca: string, referencia: string, valor: int}>  $productos
      * @param  array<int, array{valor: int, gasto_administrativo: int|null}>  $convenios
      */
-    public function corregir(array $datos, array $productos, array $convenios): bool
+    public function corregir(array $datos, array $productos, array $convenios, string $notaCorreccion): bool
     {
-        return DB::transaction(function () use ($datos, $productos, $convenios): bool {
+        return DB::transaction(function () use ($datos, $productos, $convenios, $notaCorreccion): bool {
             $actualizada = $this->actualizarSi(
                 fn (Builder $query) => $query
                     ->where('estado', EstadoVenta::Devuelta)
@@ -382,6 +384,7 @@ class Venta extends Model
                     'asesor_id' => $this->asesor_id,
                     'estado' => EstadoVenta::Pendiente,
                     'corregida_en' => now(),
+                    'nota_correccion' => $notaCorreccion,
                 ],
             );
 

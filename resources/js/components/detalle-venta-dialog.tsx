@@ -78,6 +78,14 @@ function ContenidoDetalle({
                                 Se había devuelto por: {venta.motivo_devolucion}
                             </p>
                         )}
+                        {venta.nota_correccion && (
+                            <p className="mt-1 whitespace-pre-line">
+                                <span className="font-medium">
+                                    Qué corrigió:
+                                </span>{' '}
+                                {venta.nota_correccion}
+                            </p>
+                        )}
                     </div>
                 )}
 

@@ -29,7 +29,7 @@ class PanelController extends Controller
         'Estado', 'Series asignadas en', 'Series asignadas por',
         'Número factura', 'Facturada en', 'Facturada por',
         'Motivo devolución', 'Devuelta a', 'Error de serie', 'Error de otros datos',
-        'Devuelta en', 'Devuelta por', 'Corregida en',
+        'Devuelta en', 'Devuelta por', 'Corregida en', 'Nota de corrección',
         'Motivo caída', 'Caída en',
     ];
 
@@ -191,6 +191,7 @@ class PanelController extends Controller
             $venta->devuelta_en?->format('Y-m-d H:i'),
             $venta->devueltaPor?->name,
             $venta->corregida_en?->format('Y-m-d H:i'),
+            $venta->nota_correccion,
             $venta->motivo_caida,
             $venta->caida_en?->format('Y-m-d H:i'),
         ]))->all());

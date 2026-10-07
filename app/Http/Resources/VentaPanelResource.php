@@ -67,6 +67,7 @@ class VentaPanelResource extends JsonResource
             'devolucion_por_otros' => $this->devolucion_por_otros,
             'revisar_serie' => $this->revisar_serie,
             'corregida_en' => $this->corregida_en?->format(self::FORMATO_FECHA),
+            'nota_correccion' => $this->nota_correccion,
             'motivo_caida' => $this->motivo_caida,
             'caida_en' => $this->caida_en?->format(self::FORMATO_FECHA),
         ];

@@ -111,6 +111,14 @@ class GuardarVentaRequest extends FormRequest
             'convenios.*.gasto_administrativo' => ['nullable', 'integer', 'min:1'],
 
             'observaciones' => ['nullable', 'string', 'max:1000'],
+
+            // Al corregir, el asesor explica qué cambió (siempre empieza vacío).
+            'nota_correccion' => [
+                Rule::requiredIf(fn (): bool => $this->esCorreccion()),
+                'nullable',
+                'string',
+                'max:1000',
+            ],
         ];
     }
 
@@ -190,6 +198,7 @@ class GuardarVentaRequest extends FormRequest
             'convenios.*.convenio_id.distinct' => 'Este convenio está repetido.',
             'forma_pago_inicial.required' => 'Indica si la cuota inicial se pagó en efectivo o por transferencia.',
             'numero_transferencia.required' => 'Escribe el número de la transferencia.',
+            'nota_correccion.required' => 'Explica qué corregiste.',
         ];
     }
 
@@ -250,6 +259,14 @@ class GuardarVentaRequest extends FormRequest
     }
 
     /**
+     * Lo que el asesor explica que corrigió (solo al corregir).
+     */
+    public function notaCorreccion(): string
+    {
+        return $this->string('nota_correccion')->trim()->value();
+    }
+
+    /**
      * Total de la venta: suma de los valores de los productos.
      */
     private function total(): int
@@ -279,6 +296,14 @@ class GuardarVentaRequest extends FormRequest
         $convenios = $this->input('convenios');
 
         return is_array($convenios) ? array_filter($convenios, is_array(...)) : [];
+    }
+
+    /**
+     * Se está corrigiendo una venta devuelta (la ruta trae la venta).
+     */
+    private function esCorreccion(): bool
+    {
+        return $this->route('venta') instanceof Venta;
     }
 
     private function hayInicial(): bool

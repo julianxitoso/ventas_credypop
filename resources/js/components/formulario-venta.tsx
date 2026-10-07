@@ -54,6 +54,8 @@ export type DatosVenta = {
     numero_transferencia: string;
     convenios: ConvenioFormulario[];
     observaciones: string;
+    /** Solo al corregir: qué cambió el asesor. Siempre empieza vacío. */
+    nota_correccion?: string;
 };
 
 const productoVacio: ProductoFormulario = {
@@ -624,6 +626,30 @@ export default function FormularioVenta({
                     />
                 </Campo>
             </Seccion>
+
+            {data.nota_correccion !== undefined && (
+                <Seccion titulo="Corrección">
+                    <Campo
+                        id="nota_correccion"
+                        etiqueta="¿Qué corregiste?"
+                        error={errores.nota_correccion}
+                    >
+                        <textarea
+                            id="nota_correccion"
+                            required
+                            rows={3}
+                            maxLength={1000}
+                            value={data.nota_correccion}
+                            onChange={(e) =>
+                                setData('nota_correccion', e.target.value)
+                            }
+                            placeholder="Ej. Corregí la cédula del cliente"
+                            aria-invalid={Boolean(errores.nota_correccion)}
+                            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+                        />
+                    </Campo>
+                </Seccion>
+            )}
 
             <InputError message={errores.venta} className="text-center" />
 

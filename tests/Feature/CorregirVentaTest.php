@@ -53,7 +53,9 @@ test('asesores see the sales returned to them apart from the recent ones', funct
         );
 });
 
-test('asesores open the correction form with the sale data', function () {
+test('asesores open the correction form with the sale data and an empty correction note', function () {
+    $this->venta->forceFill(['observaciones' => 'Entregar el lunes.', 'nota_correccion' => 'Corregí el correo.'])->save();
+
     $this->actingAs($this->asesor)
         ->get(route('ventas.edit', $this->venta))
         ->assertInertia(fn (Assert $page) => $page
@@ -64,13 +66,17 @@ test('asesores open the correction form with the sale data', function () {
             ->where('venta.datos.productos.0.serial', $this->producto->serial)
             ->where('venta.datos.productos.0.valor', '1250000')
             ->has('venta.datos.convenios', 1)
-            ->where('venta.datos.convenios.0.valor', '1250000'),
+            ->where('venta.datos.convenios.0.valor', '1250000')
+            ->where('venta.datos.observaciones', 'Entregar el lunes.')
+            ->where('venta.datos.nota_correccion', ''),
         );
 });
 
 test('a corrected sale that keeps every serial goes straight to billing', function () {
     $this->actingAs($this->asesor)
         ->put(route('ventas.update', $this->venta), datosDeVenta([
+            'observaciones' => 'Entregar el lunes.',
+            'nota_correccion' => ' Corregí la cédula. ',
             'cliente_cedula' => '1069999999',
             'productos' => [productoGuardado($this->venta, ['referencia' => 'UN55-NUEVA', 'serial' => 'SN-INTENTO'])],
         ]))
@@ -81,6 +87,8 @@ test('a corrected sale that keeps every serial goes straight to billing', functi
 
     expect($this->venta->estado)->toBe(EstadoVenta::ConSerie)
         ->and($this->venta->cliente_cedula)->toBe('1069999999')
+        ->and($this->venta->observaciones)->toBe('Entregar el lunes.')
+        ->and($this->venta->nota_correccion)->toBe('Corregí la cédula.')
         ->and($this->venta->con_serie_en)->not->toBeNull()
         ->and($this->venta->corregida_en)->not->toBeNull()
         ->and($this->venta->productos->sole()->only(['id', 'referencia', 'serial']))->toBe([
@@ -96,6 +104,7 @@ test('a corrected sale with a new product goes back to bodega', function () {
 
     $this->actingAs($this->asesor)
         ->put(route('ventas.update', $this->venta), datosDeVenta([
+            'nota_correccion' => 'Agregué el soporte.',
             'productos' => [
                 productoGuardado($this->venta, ['valor' => '1000000']),
                 ['articulo' => 'Soporte', 'marca' => 'Genérico', 'referencia' => 'S1', 'valor' => '100000'],
@@ -118,7 +127,10 @@ test('when the serial was also wrong the corrected sale goes back to bodega', fu
     $this->venta->forceFill(['devolucion_por_serie' => true, 'revisar_serie' => true])->save();
 
     $this->actingAs($this->asesor)
-        ->put(route('ventas.update', $this->venta), datosDeVenta(['productos' => [productoGuardado($this->venta)]]))
+        ->put(route('ventas.update', $this->venta), datosDeVenta([
+            'nota_correccion' => 'Corregí el nombre.',
+            'productos' => [productoGuardado($this->venta)],
+        ]))
         ->assertSessionHasNoErrors();
 
     expect($this->venta->refresh())
@@ -131,6 +143,14 @@ test('the correction uses the same validation as a new sale', function () {
     $this->actingAs($this->asesor)
         ->put(route('ventas.update', $this->venta), datosDeVenta(['cliente_celular' => '123']))
         ->assertSessionHasErrors('cliente_celular');
+
+    expect($this->venta->refresh()->estado)->toBe(EstadoVenta::Devuelta);
+});
+
+test('the asesor must explain what was corrected', function () {
+    $this->actingAs($this->asesor)
+        ->put(route('ventas.update', $this->venta), datosDeVenta(['nota_correccion' => ' ']))
+        ->assertSessionHasErrors(['nota_correccion' => 'Explica qué corregiste.']);
 
     expect($this->venta->refresh()->estado)->toBe(EstadoVenta::Devuelta);
 });

@@ -71,6 +71,8 @@ export type VentaPanel = {
     /** Bodega debe revisar las series cuando el asesor corrija. */
     revisar_serie: boolean;
     corregida_en: string | null;
+    /** Lo que el asesor explicó que corrigió la última vez. */
+    nota_correccion: string | null;
     motivo_caida: string | null;
     caida_en: string | null;
 };

@@ -106,6 +106,7 @@ class VentaController extends Controller
                         'gasto_administrativo' => (string) ($convenio->gasto_administrativo ?? ''),
                     ])->values()->all(),
                     'observaciones' => $venta->observaciones ?? '',
+                    'nota_correccion' => '',
                 ],
             ],
         ]);
@@ -118,7 +119,7 @@ class VentaController extends Controller
     {
         $datos = $request->datosVenta();
 
-        if (! $venta->corregir($datos['venta'], $datos['productos'], $datos['convenios'])) {
+        if (! $venta->corregir($datos['venta'], $datos['productos'], $datos['convenios'], $request->notaCorreccion())) {
             $this->avisarYaProcesada();
         }
 
