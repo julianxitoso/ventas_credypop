@@ -78,10 +78,11 @@ class GuardarVentaRequest extends FormRequest
 
             'productos' => ['required', 'array', 'min:1', 'max:'.self::MAXIMO_PRODUCTOS],
             'productos.*' => ['array'],
+            // id de un producto ya existente (al corregir), para conservar su serie
+            'productos.*.id' => ['nullable', 'integer'],
             'productos.*.articulo' => ['required', 'string', 'max:150'],
             'productos.*.marca' => ['required', 'string', 'max:80'],
             'productos.*.referencia' => ['required', 'string', 'max:80'],
-            'productos.*.serial' => ['nullable', 'string', 'max:100'],
             'productos.*.valor' => ['required', 'integer', 'min:1'],
 
             'valor_inicial' => ['required', 'integer', 'min:0'],
@@ -171,7 +172,6 @@ class GuardarVentaRequest extends FormRequest
             'productos.*.articulo' => 'artículo',
             'productos.*.marca' => 'marca',
             'productos.*.referencia' => 'referencia',
-            'productos.*.serial' => 'serie',
             'productos.*.valor' => 'valor del producto',
             'convenios.*.convenio_id' => 'convenio',
             'convenios.*.valor' => 'valor del convenio',
@@ -201,7 +201,7 @@ class GuardarVentaRequest extends FormRequest
      *
      * @return array{
      *     venta: array<string, mixed>,
-     *     productos: list<array{articulo: string, marca: string, referencia: string, serial: string|null, valor: int}>,
+     *     productos: list<array{id: int|null, articulo: string, marca: string, referencia: string, valor: int}>,
      *     convenios: array<int, array{valor: int, gasto_administrativo: int|null}>
      * }
      */
@@ -212,10 +212,10 @@ class GuardarVentaRequest extends FormRequest
         $formaPago = $this->hayInicial() ? ($datos['forma_pago_inicial'] ?? null) : null;
 
         $productos = array_values(array_map(fn (array $producto): array => [
+            'id' => isset($producto['id']) ? (int) $producto['id'] : null,
             'articulo' => $producto['articulo'],
             'marca' => $producto['marca'],
             'referencia' => $producto['referencia'],
-            'serial' => $producto['serial'] ?? null,
             'valor' => (int) $producto['valor'],
         ], $datos['productos']));
 

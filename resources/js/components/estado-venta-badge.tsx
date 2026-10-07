@@ -5,6 +5,10 @@ import type { EstadoVenta } from '@/types';
 const estilos: Record<EstadoVenta, { etiqueta: string; clases: string }> = {
     pendiente: {
         etiqueta: 'Pendiente',
+        clases: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+    },
+    con_serie: {
+        etiqueta: 'Pendiente con serie',
         clases: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
     },
     facturada: {
@@ -13,7 +17,7 @@ const estilos: Record<EstadoVenta, { etiqueta: string; clases: string }> = {
     },
     devuelta: {
         etiqueta: 'Devuelta',
-        clases: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+        clases: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
     },
     caida: {
         etiqueta: 'Caída',

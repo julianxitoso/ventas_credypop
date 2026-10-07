@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EstadoVenta;
+use App\Enums\ResponsableDevolucion;
 use App\Http\Requests\GuardarVentaRequest;
 use App\Http\Requests\MarcarVentaCaidaRequest;
 use App\Models\Convenio;
@@ -32,10 +33,18 @@ class VentaController extends Controller
         return Inertia::render('ventas/registrar', [
             'convenios' => $this->conveniosActivos(),
             'porCorregir' => $this->resumen(
-                (clone $ventas)->where('estado', EstadoVenta::Devuelta)->get(),
+                (clone $ventas)
+                    ->where('estado', EstadoVenta::Devuelta)
+                    ->where('devuelta_a', ResponsableDevolucion::Asesor)
+                    ->get(),
             ),
             'misVentas' => $this->resumen(
-                $ventas->where('estado', '!=', EstadoVenta::Devuelta)->limit(self::VENTAS_RECIENTES)->get(),
+                $ventas
+                    ->whereNot(fn ($query) => $query
+                        ->where('estado', EstadoVenta::Devuelta)
+                        ->where('devuelta_a', ResponsableDevolucion::Asesor))
+                    ->limit(self::VENTAS_RECIENTES)
+                    ->get(),
             ),
         ]);
     }
@@ -81,6 +90,7 @@ class VentaController extends Controller
                     'cliente_direccion' => $venta->cliente_direccion ?? '',
                     'cliente_ciudad' => $venta->cliente_ciudad ?? '',
                     'productos' => $venta->productos->map(fn (VentaProducto $producto): array => [
+                        'id' => $producto->id,
                         'articulo' => $producto->articulo,
                         'marca' => $producto->marca,
                         'referencia' => $producto->referencia,
@@ -157,6 +167,7 @@ class VentaController extends Controller
             'articulo' => $venta->resumenProductos(),
             'valor_venta' => $venta->valor_venta,
             'estado' => $venta->estado->value,
+            'devuelta_a' => $venta->devuelta_a?->value,
             'numero_factura' => $venta->numero_factura,
             'motivo_devolucion' => $venta->motivo_devolucion,
             'motivo_caida' => $venta->motivo_caida,

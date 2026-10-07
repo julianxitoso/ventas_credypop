@@ -18,7 +18,7 @@ import { resumen } from '@/routes';
 type Indicadores = {
     /** Solo ventas facturadas: la venta real. */
     valorVendido: number;
-    /** Pendientes + devueltas: aún pueden caerse. */
+    /** Pendientes (con y sin serie) + devueltas: aún pueden caerse. */
     porFacturar: number;
     totalRegistrado: number;
     /** Todas las ventas no caídas: la inicial se recibe al registrar. */
@@ -37,7 +37,9 @@ type Dia = {
     cantidad: number;
     valor: number;
     facturadas: number;
+    /** Sin serie todavía. */
     pendientes: number;
+    conSerie: number;
     devueltas: number;
 };
 
@@ -85,8 +87,13 @@ const ESTADOS_POR_DIA = [
         color: 'var(--grafica-facturada)',
     },
     {
+        clave: 'conSerie',
+        etiqueta: 'Con serie',
+        color: 'var(--grafica-con-serie)',
+    },
+    {
         clave: 'pendientes',
-        etiqueta: 'Pendientes',
+        etiqueta: 'Sin serie',
         color: 'var(--grafica-pendiente)',
     },
     {

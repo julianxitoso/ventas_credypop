@@ -14,6 +14,7 @@ beforeEach(function () {
 
 test('the panel shows todays indicators', function () {
     Venta::factory()->count(2)->create(['valor_venta' => 1_000_000]);
+    Venta::factory()->conSerie()->create(['valor_venta' => 500_000]);
     Venta::factory()->create(['estado' => EstadoVenta::Facturada, 'facturada_en' => now()]);
     Venta::factory()->create(['estado' => EstadoVenta::Facturada, 'facturada_en' => now()->subDay()]);
     Venta::factory()->create(['estado' => EstadoVenta::Devuelta, 'devuelta_en' => now()]);
@@ -23,28 +24,26 @@ test('the panel shows todays indicators', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('panel/index')
             ->where('indicadores', [
-                'pendientes' => 2,
+                'conSerie' => 1,
+                'sinSerie' => 2,
                 'facturadasHoy' => 1,
                 'devueltasHoy' => 1,
-                'valorPendiente' => 2_000_000,
+                'valorPendiente' => 2_500_000,
             ])
             ->where('puedeFacturar', true),
         );
 });
 
-test('the panel reports the latest sale and correction so it can announce new work', function () {
-    Venta::factory()->create();
-    $ultima = Venta::factory()->create([
-        'estado' => EstadoVenta::Pendiente,
-        'corregida_en' => '2026-09-30 10:15:00',
-    ]);
+test('the panel reports the latest sale and the latest one ready to bill so it can announce new work', function () {
+    Venta::factory()->conSerie()->create(['con_serie_en' => '2026-09-30 10:15:00']);
+    $ultima = Venta::factory()->create();
 
     $this->actingAs($this->facturador)
         ->get(route('panel', ['pestana' => 'historial', 'buscar' => 'no-coincide']))
         ->assertInertia(fn (Assert $page) => $page
             ->has('ventas.data', 0)
             ->where('ultimaVentaId', $ultima->id)
-            ->where('ultimaCorreccion', '2026-09-30 10:15:00'),
+            ->where('ultimaListaParaFacturar', '2026-09-30 10:15:00'),
         );
 });
 
@@ -58,27 +57,31 @@ test('the periodic refresh brings sales registered after the panel was opened', 
     $response->assertInertia(fn (Assert $page) => $page
         ->where('ultimaVentaId', $antes->id)
         ->reloadOnly(
-            ['ventas', 'indicadores', 'ultimaVentaId', 'ultimaCorreccion'],
+            ['ventas', 'indicadores', 'ultimaVentaId', 'ultimaListaParaFacturar'],
             fn (Assert $recarga) => $recarga
                 ->where('ultimaVentaId', $nueva->id)
-                ->where('indicadores.pendientes', 2)
+                ->where('indicadores.sinSerie', 2)
                 ->where('ventas.data.0.id', $nueva->id)
                 ->missing('filtros'),
         ),
     );
 });
 
-test('the pending tab only lists pending sales, newest first', function () {
+test('the pending tab lists sales ready to bill first, then those waiting for bodega, newest first', function () {
+    $conSerie = Venta::factory()->conSerie()->create();
     $antigua = Venta::factory()->create();
     $reciente = Venta::factory()->create();
     Venta::factory()->create(['estado' => EstadoVenta::Facturada]);
+    Venta::factory()->devuelta()->create();
 
     $this->actingAs($this->facturador)
         ->get(route('panel'))
         ->assertInertia(fn (Assert $page) => $page
-            ->has('ventas.data', 2)
-            ->where('ventas.data.0.id', $reciente->id)
-            ->where('ventas.data.1.id', $antigua->id),
+            ->has('ventas.data', 3)
+            ->where('ventas.data.0.id', $conSerie->id)
+            ->where('ventas.data.0.estado', 'con_serie')
+            ->where('ventas.data.1.id', $reciente->id)
+            ->where('ventas.data.2.id', $antigua->id),
         );
 });
 

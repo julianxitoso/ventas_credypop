@@ -3,8 +3,10 @@ import { Download, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
+import AccionesFacturacion from '@/components/acciones-facturacion';
 import DetalleVentaDialog from '@/components/detalle-venta-dialog';
 import EstadoVentaBadge from '@/components/estado-venta-badge';
+import Paginacion from '@/components/paginacion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -32,7 +34,8 @@ type Props = {
     ventas: Paginado<VentaPanel>;
     puedeFacturar: boolean;
     ultimaVentaId: number;
-    ultimaCorreccion: string | null;
+    /** Última vez que una venta quedó con serie (lista para facturar). */
+    ultimaListaParaFacturar: string | null;
 };
 
 const TODOS = 'todos';
@@ -54,11 +57,12 @@ export default function Panel({
     ventas,
     puedeFacturar,
     ultimaVentaId,
-    ultimaCorreccion,
+    ultimaListaParaFacturar,
 }: Props) {
     const [busqueda, setBusqueda] = useState(filtros.buscar);
     const [seleccionada, setSeleccionada] = useState<VentaPanel | null>(null);
-    const vistoAntes = useRef({ ultimaVentaId, ultimaCorreccion });
+    const vistoAntes = useRef({ ultimaVentaId, ultimaListaParaFacturar });
+    const pendientes = indicadores.conSerie + indicadores.sinSerie;
     const nuevasSinVer = useRef(0);
 
     usePoll(
@@ -68,7 +72,7 @@ export default function Panel({
                 'ventas',
                 'indicadores',
                 'ultimaVentaId',
-                'ultimaCorreccion',
+                'ultimaListaParaFacturar',
             ],
             showProgress: false,
         },
@@ -99,18 +103,19 @@ export default function Panel({
         }
 
         if (
-            ultimaCorreccion !== null &&
-            ultimaCorreccion !== vistoAntes.current.ultimaCorreccion
+            ultimaListaParaFacturar !== null &&
+            ultimaListaParaFacturar !==
+                vistoAntes.current.ultimaListaParaFacturar
         ) {
-            toast.info('Una venta corregida volvió a pendientes', {
-                id: 'venta-corregida',
+            toast.info('Hay ventas con serie listas para facturar', {
+                id: 'lista-para-facturar',
                 duration: Infinity,
                 closeButton: true,
             });
         }
 
-        vistoAntes.current = { ultimaVentaId, ultimaCorreccion };
-    }, [ultimaVentaId, ultimaCorreccion]);
+        vistoAntes.current = { ultimaVentaId, ultimaListaParaFacturar };
+    }, [ultimaVentaId, ultimaListaParaFacturar]);
 
     function aplicarFiltros(cambios: Partial<FiltrosPanel>) {
         router.get(panel.url(), consultaDe({ ...filtros, ...cambios }), {
@@ -137,8 +142,8 @@ export default function Panel({
         <>
             <Head
                 title={
-                    indicadores.pendientes > 0
-                        ? `(${indicadores.pendientes}) Panel de ventas`
+                    indicadores.conSerie > 0
+                        ? `(${indicadores.conSerie}) Panel de ventas`
                         : 'Panel de ventas'
                 }
             />
@@ -156,8 +161,9 @@ export default function Panel({
 
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <Indicador
-                        titulo="Ventas pendientes"
-                        valor={String(indicadores.pendientes)}
+                        titulo="Listas para facturar"
+                        valor={String(indicadores.conSerie)}
+                        detalle={`${indicadores.sinSerie} esperando serie de bodega`}
                         clases="text-amber-600 dark:text-amber-400"
                     />
                     <Indicador
@@ -168,7 +174,7 @@ export default function Panel({
                     <Indicador
                         titulo="Devueltas hoy"
                         valor={String(indicadores.devueltasHoy)}
-                        clases="text-red-600 dark:text-red-400"
+                        clases="text-purple-600 dark:text-purple-400"
                     />
                     <Indicador
                         titulo="Valor pendiente"
@@ -183,7 +189,7 @@ export default function Panel({
                             actual={filtros.pestana}
                             filtros={filtros}
                         >
-                            Pendientes ({indicadores.pendientes})
+                            Pendientes ({pendientes})
                         </PestanaLink>
                         <PestanaLink
                             pestana="historial"
@@ -227,6 +233,9 @@ export default function Panel({
                                 <SelectItem value="pendiente">
                                     Pendiente
                                 </SelectItem>
+                                <SelectItem value="con_serie">
+                                    Pendiente con serie
+                                </SelectItem>
                                 <SelectItem value="facturada">
                                     Facturada
                                 </SelectItem>
@@ -257,15 +266,24 @@ export default function Panel({
                             ventas={ventas.data}
                             onSeleccionar={setSeleccionada}
                         />
-                        <Paginacion ventas={ventas} />
+                        <Paginacion pagina={ventas} />
                     </>
                 )}
             </div>
 
             <DetalleVentaDialog
                 venta={seleccionada}
-                puedeFacturar={puedeFacturar}
                 onClose={() => setSeleccionada(null)}
+                acciones={
+                    puedeFacturar
+                        ? (venta, onClose) => (
+                              <AccionesFacturacion
+                                  venta={venta}
+                                  onClose={onClose}
+                              />
+                          )
+                        : undefined
+                }
             />
         </>
     );
@@ -274,16 +292,21 @@ export default function Panel({
 function Indicador({
     titulo,
     valor,
+    detalle,
     clases,
 }: {
     titulo: string;
     valor: string;
+    detalle?: string;
     clases?: string;
 }) {
     return (
         <div className="rounded-xl border bg-card p-4 shadow-xs">
             <p className="text-sm text-muted-foreground">{titulo}</p>
             <p className={cn('mt-1 text-2xl font-semibold', clases)}>{valor}</p>
+            {detalle && (
+                <p className="mt-1 text-xs text-muted-foreground">{detalle}</p>
+            )}
         </div>
     );
 }
@@ -430,52 +453,6 @@ function TarjetasVentas({
                 </li>
             ))}
         </ul>
-    );
-}
-
-function Paginacion({ ventas }: { ventas: Paginado<VentaPanel> }) {
-    const { meta, links } = ventas;
-
-    if (meta.last_page <= 1) {
-        return null;
-    }
-
-    return (
-        <div className="flex items-center justify-between gap-3 text-sm">
-            <p className="text-muted-foreground">
-                {meta.from}–{meta.to} de {meta.total}
-            </p>
-            <div className="flex gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!links.prev}
-                    asChild={Boolean(links.prev)}
-                >
-                    {links.prev ? (
-                        <Link href={links.prev} preserveState preserveScroll>
-                            Anterior
-                        </Link>
-                    ) : (
-                        <span>Anterior</span>
-                    )}
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!links.next}
-                    asChild={Boolean(links.next)}
-                >
-                    {links.next ? (
-                        <Link href={links.next} preserveState preserveScroll>
-                            Siguiente
-                        </Link>
-                    ) : (
-                        <span>Siguiente</span>
-                    )}
-                </Button>
-            </div>
-        </div>
     );
 }
 

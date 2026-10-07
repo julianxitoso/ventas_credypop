@@ -50,11 +50,11 @@ test('only billed sales count as sold and down payments count for every sale tha
             ->has('porDia', 17)
             ->where('porDia.15', [
                 'dia' => '2026-09-16', 'etiqueta' => '16/09', 'cantidad' => 1, 'valor' => 1_000_000,
-                'facturadas' => 1, 'pendientes' => 0, 'devueltas' => 0,
+                'facturadas' => 1, 'pendientes' => 0, 'conSerie' => 0, 'devueltas' => 0,
             ])
             ->where('porDia.16', [
                 'dia' => '2026-09-17', 'etiqueta' => '17/09', 'cantidad' => 2, 'valor' => 2_500_000,
-                'facturadas' => 0, 'pendientes' => 1, 'devueltas' => 1,
+                'facturadas' => 0, 'pendientes' => 1, 'conSerie' => 0, 'devueltas' => 1,
             ])
             ->where('porDia.1.cantidad', 0),
         );
@@ -82,6 +82,27 @@ test('the dashboard groups sales by asesor and by convenio', function () {
                 ['nombre' => 'Contado', 'ventas' => 2, 'valor' => 800_000, 'porFacturar' => 400_000, 'color' => 0],
                 ['nombre' => 'Addi', 'ventas' => 1, 'valor' => 0, 'porFacturar' => 2_000_000, 'color' => 1],
             ]),
+        );
+});
+
+test('sales with serials are still pending to bill', function () {
+    Venta::factory()
+        ->for($this->ana, 'asesor')
+        ->conConvenio($this->addi)
+        ->conSerie()
+        ->create(['valor_venta' => 300_000, 'created_at' => '2026-09-17 12:00']);
+
+    $this->actingAs($this->gerente)
+        ->get(route('resumen', ['periodo' => 'hoy']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('indicadores.porFacturar', 2_800_000)
+            ->where('indicadores.pendientes', 2)
+            ->where('porDia.0.pendientes', 1)
+            ->where('porDia.0.conSerie', 1)
+            ->where('porAsesor.0.nombre', 'Ana')
+            ->where('porAsesor.0.porFacturar', 2_300_000)
+            ->where('porConvenio.0.nombre', 'Addi')
+            ->where('porConvenio.0.porFacturar', 2_300_000),
         );
 });
 

@@ -63,7 +63,7 @@ function datosDeVenta(array $cambios = []): array
         'cliente_direccion' => 'Calle 5 # 10-20',
         'cliente_ciudad' => 'Popayán',
         'productos' => [
-            ['articulo' => 'Televisor', 'marca' => 'Samsung', 'referencia' => 'UN55', 'serial' => 'SN-0001', 'valor' => '1250000'],
+            ['articulo' => 'Televisor', 'marca' => 'Samsung', 'referencia' => 'UN55', 'valor' => '1250000'],
         ],
         'valor_inicial' => '',
         'forma_pago_inicial' => '',

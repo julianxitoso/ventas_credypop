@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\EstadoVenta;
+use App\Enums\ResponsableDevolucion;
 use App\Models\Convenio;
 use App\Models\User;
 use App\Models\Venta;
@@ -54,6 +56,37 @@ class VentaFactory extends Factory
                 ]);
             }
         });
+    }
+
+    /**
+     * Bodega ya asignó la serie de todos los productos: lista para facturar.
+     */
+    public function conSerie(): static
+    {
+        return $this->state(fn (): array => [
+            'estado' => EstadoVenta::ConSerie,
+            'series_asignadas_en' => now(),
+            'con_serie_en' => now(),
+        ])->afterCreating(function (Venta $venta): void {
+            $venta->productos()->whereNull('serial')->each(
+                fn (VentaProducto $producto) => $producto->update(['serial' => fake()->unique()->bothify('SN-########')]),
+            );
+        });
+    }
+
+    /**
+     * Devuelta por el facturador a quien debe corregirla.
+     */
+    public function devuelta(ResponsableDevolucion $devueltaA = ResponsableDevolucion::Asesor): static
+    {
+        return $this->state(fn (): array => [
+            'estado' => EstadoVenta::Devuelta,
+            'motivo_devolucion' => 'Revisar los datos.',
+            'devuelta_en' => now(),
+            'devuelta_a' => $devueltaA,
+            'devolucion_por_serie' => $devueltaA === ResponsableDevolucion::Bodega,
+            'devolucion_por_otros' => $devueltaA === ResponsableDevolucion::Asesor,
+        ]);
     }
 
     /**

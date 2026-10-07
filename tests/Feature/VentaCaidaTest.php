@@ -23,7 +23,7 @@ test('asesores mark their unbilled sales as fallen with a reason', function (Est
     expect($venta->estado)->toBe(EstadoVenta::Caida)
         ->and($venta->motivo_caida)->toBe('El cliente desistió.')
         ->and($venta->caida_en)->not->toBeNull();
-})->with([EstadoVenta::Pendiente, EstadoVenta::Devuelta]);
+})->with([EstadoVenta::Pendiente, EstadoVenta::ConSerie, EstadoVenta::Devuelta]);
 
 test('the reason is required to mark a sale as fallen', function () {
     $venta = Venta::factory()->for($this->asesor, 'asesor')->create();

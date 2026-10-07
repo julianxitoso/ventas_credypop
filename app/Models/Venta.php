@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Enums\EstadoVenta;
 use App\Enums\FormaPagoInicial;
+use App\Enums\ResponsableDevolucion;
 use Carbon\CarbonImmutable;
+use Closure;
 use Database\Factories\VentaFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -34,12 +36,19 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $numero_transferencia
  * @property string|null $observaciones
  * @property EstadoVenta $estado
+ * @property CarbonImmutable|null $series_asignadas_en
+ * @property int|null $series_asignadas_por
+ * @property CarbonImmutable|null $con_serie_en Última vez que quedó lista para facturar.
  * @property string|null $numero_factura
  * @property CarbonImmutable|null $facturada_en
  * @property int|null $facturada_por
  * @property string|null $motivo_devolucion
  * @property CarbonImmutable|null $devuelta_en
  * @property int|null $devuelta_por
+ * @property ResponsableDevolucion|null $devuelta_a Quién debe corregir la devolución.
+ * @property bool $devolucion_por_serie
+ * @property bool $devolucion_por_otros
+ * @property bool $revisar_serie Bodega debe revisar las series aunque ya estén puestas.
  * @property CarbonImmutable|null $corregida_en
  * @property string|null $motivo_caida
  * @property CarbonImmutable|null $caida_en
@@ -52,6 +61,7 @@ use Illuminate\Support\Facades\DB;
  * @property-read Collection<int, ConvenioVenta> $conveniosVenta
  * @property-read User|null $facturador
  * @property-read User|null $devueltaPor
+ * @property-read User|null $seriesAsignadasPor
  */
 class Venta extends Model
 {
@@ -60,8 +70,8 @@ class Venta extends Model
 
     protected $table = 'ventas';
 
-    // Solo lo que diligencia el asesor. El estado y la facturación
-    // se cambian con acciones del facturador, nunca desde el formulario.
+    // Solo lo que diligencia el asesor. El estado, las series y la facturación
+    // se cambian con las acciones de bodega y del facturador, nunca desde el formulario.
     protected $fillable = [
         'asesor_id',
         'cliente_nombre', 'cliente_cedula', 'cliente_celular', 'cliente_telefono', 'cliente_celular_2',
@@ -77,8 +87,14 @@ class Venta extends Model
             'forma_pago_inicial' => FormaPagoInicial::class,
             'valor_venta' => 'integer',
             'valor_inicial' => 'integer',
+            'series_asignadas_en' => 'datetime',
+            'con_serie_en' => 'datetime',
             'facturada_en' => 'datetime',
             'devuelta_en' => 'datetime',
+            'devuelta_a' => ResponsableDevolucion::class,
+            'devolucion_por_serie' => 'boolean',
+            'devolucion_por_otros' => 'boolean',
+            'revisar_serie' => 'boolean',
             'corregida_en' => 'datetime',
             'caida_en' => 'datetime',
         ];
@@ -157,16 +173,42 @@ class Venta extends Model
     }
 
     /**
-     * Reemplaza los productos y los convenios de la venta.
+     * Guarda los productos y los convenios de la venta. Los productos que
+     * traen el id de uno existente se actualizan conservando su serie (la
+     * asigna bodega); los demás se crean sin serie y los que no vienen se borran.
      *
-     * @param  list<array{articulo: string, marca: string, referencia: string, serial: string|null, valor: int}>  $productos
+     * @param  list<array{id?: int|null, articulo: string, marca: string, referencia: string, valor: int}>  $productos
      * @param  array<int, array{valor: int, gasto_administrativo: int|null}>  $convenios  Llave: id del convenio.
      */
     public function guardarDetalle(array $productos, array $convenios): void
     {
-        $this->productos()->delete();
-        $this->productos()->createMany($productos);
+        $existentes = $this->productos()->get()->keyBy('id');
+        $conservados = [];
+
+        foreach ($productos as $producto) {
+            $datos = Arr::only($producto, ['articulo', 'marca', 'referencia', 'valor']);
+            $existente = $existentes->get($producto['id'] ?? 0);
+
+            if ($existente !== null) {
+                $existente->update($datos);
+                $conservados[] = $existente->id;
+            } else {
+                $conservados[] = $this->productos()->create($datos)->id;
+            }
+        }
+
+        $this->productos()->whereNotIn('id', $conservados)->delete();
         $this->convenios()->sync($convenios);
+    }
+
+    /**
+     * Si todos los productos tienen serie asignada.
+     */
+    public function tieneTodasLasSeries(): bool
+    {
+        return ! $this->productos()
+            ->where(fn (Builder $query) => $query->whereNull('serial')->orWhere('serial', ''))
+            ->exists();
     }
 
     /**
@@ -183,6 +225,28 @@ class Venta extends Model
     public function devueltaPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'devuelta_por');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function seriesAsignadasPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'series_asignadas_por');
+    }
+
+    /**
+     * Ventas que bodega debe trabajar: pendientes de serie y devueltas a bodega.
+     *
+     * @param  Builder<Venta>  $query
+     */
+    public function scopeACargoDeBodega(Builder $query): void
+    {
+        $query->where(fn (Builder $query) => $query
+            ->where('estado', EstadoVenta::Pendiente)
+            ->orWhere(fn (Builder $devuelta) => $devuelta
+                ->where('estado', EstadoVenta::Devuelta)
+                ->where('devuelta_a', ResponsableDevolucion::Bodega)));
     }
 
     /**
@@ -213,12 +277,63 @@ class Venta extends Model
     }
 
     /**
-     * Factura la venta solo si sigue pendiente.
+     * Bodega asigna la serie de cada producto y la venta queda lista para
+     * facturar. Solo si está a cargo de bodega (pendiente o devuelta a bodega).
+     *
+     * @param  array<int, string>  $series  Llave: id del producto.
+     */
+    public function asignarSeries(array $series, User $bodega): bool
+    {
+        return DB::transaction(function () use ($series, $bodega): bool {
+            $actualizada = $this->actualizarSi(
+                fn (Builder $query) => $query->aCargoDeBodega(),
+                [
+                    'estado' => EstadoVenta::ConSerie,
+                    'series_asignadas_en' => now(),
+                    'series_asignadas_por' => $bodega->id,
+                    'con_serie_en' => now(),
+                    'revisar_serie' => false,
+                ],
+            );
+
+            if ($actualizada) {
+                foreach ($this->productos()->get() as $producto) {
+                    $producto->update(['serial' => $series[$producto->id]]);
+                }
+            }
+
+            return $actualizada;
+        });
+    }
+
+    /**
+     * Bodega devuelve la venta al asesor por un problema que no es de serie.
+     * Cuando el asesor la corrija, vuelve a bodega (revisar_serie).
+     */
+    public function devolverDesdeBodega(string $motivo, User $bodega): bool
+    {
+        return $this->actualizarSi(
+            fn (Builder $query) => $query->aCargoDeBodega(),
+            [
+                'estado' => EstadoVenta::Devuelta,
+                'devuelta_a' => ResponsableDevolucion::Asesor,
+                'devolucion_por_serie' => false,
+                'devolucion_por_otros' => true,
+                'revisar_serie' => true,
+                'motivo_devolucion' => $motivo,
+                'devuelta_en' => now(),
+                'devuelta_por' => $bodega->id,
+            ],
+        );
+    }
+
+    /**
+     * Factura la venta solo si ya tiene serie (pendiente con serie).
      * Devuelve false si otro usuario ya la procesó.
      */
     public function facturar(string $numeroFactura, User $facturador): bool
     {
-        return $this->actualizarSiEstaEn([EstadoVenta::Pendiente], [
+        return $this->actualizarSiEstaEn([EstadoVenta::ConSerie], [
             'estado' => EstadoVenta::Facturada,
             'numero_factura' => $numeroFactura,
             'facturada_en' => now(),
@@ -227,13 +342,18 @@ class Venta extends Model
     }
 
     /**
-     * Devuelve la venta al asesor solo si sigue pendiente.
-     * Devuelve false si otro usuario ya la procesó.
+     * El facturador devuelve una venta con serie según el tipo de error:
+     * solo otros datos → asesor; solo serie → bodega; ambos → primero el
+     * asesor y después bodega (revisar_serie).
      */
-    public function devolver(string $motivo, User $facturador): bool
+    public function devolver(string $motivo, bool $porSerie, bool $porOtros, User $facturador): bool
     {
-        return $this->actualizarSiEstaEn([EstadoVenta::Pendiente], [
+        return $this->actualizarSiEstaEn([EstadoVenta::ConSerie], [
             'estado' => EstadoVenta::Devuelta,
+            'devuelta_a' => $porOtros ? ResponsableDevolucion::Asesor : ResponsableDevolucion::Bodega,
+            'devolucion_por_serie' => $porSerie,
+            'devolucion_por_otros' => $porOtros,
+            'revisar_serie' => $porSerie && $porOtros,
             'motivo_devolucion' => $motivo,
             'devuelta_en' => now(),
             'devuelta_por' => $facturador->id,
@@ -241,29 +361,41 @@ class Venta extends Model
     }
 
     /**
-     * El asesor corrige una venta devuelta (datos, productos y convenios) y la
-     * envía de nuevo a facturación. Se conserva el último motivo de devolución.
-     * Todo o nada: si la venta ya no está devuelta, no cambia nada.
+     * El asesor corrige una venta que le devolvieron (datos, productos y
+     * convenios). Si todos los productos conservan su serie y no hay que
+     * revisarla, vuelve directo al facturador; si no, pasa por bodega.
+     * Se conserva el último motivo de devolución. Todo o nada.
      *
      * @param  array<string, mixed>  $datos
-     * @param  list<array{articulo: string, marca: string, referencia: string, serial: string|null, valor: int}>  $productos
+     * @param  list<array{id?: int|null, articulo: string, marca: string, referencia: string, valor: int}>  $productos
      * @param  array<int, array{valor: int, gasto_administrativo: int|null}>  $convenios
      */
     public function corregir(array $datos, array $productos, array $convenios): bool
     {
         return DB::transaction(function () use ($datos, $productos, $convenios): bool {
-            $actualizada = $this->actualizarSiEstaEn([EstadoVenta::Devuelta], [
-                ...Arr::only($datos, $this->getFillable()),
-                'asesor_id' => $this->asesor_id,
-                'estado' => EstadoVenta::Pendiente,
-                'corregida_en' => now(),
-            ]);
+            $actualizada = $this->actualizarSi(
+                fn (Builder $query) => $query
+                    ->where('estado', EstadoVenta::Devuelta)
+                    ->where('devuelta_a', ResponsableDevolucion::Asesor),
+                [
+                    ...Arr::only($datos, $this->getFillable()),
+                    'asesor_id' => $this->asesor_id,
+                    'estado' => EstadoVenta::Pendiente,
+                    'corregida_en' => now(),
+                ],
+            );
 
-            if ($actualizada) {
-                $this->guardarDetalle($productos, $convenios);
+            if (! $actualizada) {
+                return false;
             }
 
-            return $actualizada;
+            $this->guardarDetalle($productos, $convenios);
+
+            if (! $this->revisar_serie && $this->tieneTodasLasSeries()) {
+                $this->forceFill(['estado' => EstadoVenta::ConSerie, 'con_serie_en' => now()])->save();
+            }
+
+            return true;
         });
     }
 
@@ -272,21 +404,31 @@ class Venta extends Model
      */
     public function marcarCaida(string $motivo): bool
     {
-        return $this->actualizarSiEstaEn([EstadoVenta::Pendiente, EstadoVenta::Devuelta], [
+        return $this->actualizarSiEstaEn([EstadoVenta::Pendiente, EstadoVenta::ConSerie, EstadoVenta::Devuelta], [
             'estado' => EstadoVenta::Caida,
             'motivo_caida' => $motivo,
             'caida_en' => now(),
         ]);
     }
 
+    /**
+     * El asesor solo corrige las devoluciones que le corresponden a él.
+     */
     public function sePuedeCorregir(): bool
     {
-        return $this->estado === EstadoVenta::Devuelta;
+        return $this->estado === EstadoVenta::Devuelta
+            && $this->devuelta_a === ResponsableDevolucion::Asesor;
     }
 
     public function sePuedeMarcarCaida(): bool
     {
-        return in_array($this->estado, [EstadoVenta::Pendiente, EstadoVenta::Devuelta], true);
+        return in_array($this->estado, [EstadoVenta::Pendiente, EstadoVenta::ConSerie, EstadoVenta::Devuelta], true);
+    }
+
+    public function estaACargoDeBodega(): bool
+    {
+        return $this->estado === EstadoVenta::Pendiente
+            || ($this->estado === EstadoVenta::Devuelta && $this->devuelta_a === ResponsableDevolucion::Bodega);
     }
 
     /**
@@ -298,10 +440,21 @@ class Venta extends Model
      */
     private function actualizarSiEstaEn(array $estados, array $cambios): bool
     {
-        $actualizada = static::query()
-            ->whereKey($this->getKey())
-            ->whereIn('estado', $estados)
-            ->update($cambios) === 1;
+        return $this->actualizarSi(fn (Builder $query) => $query->whereIn('estado', $estados), $cambios);
+    }
+
+    /**
+     * Actualiza la venta solo si todavía cumple la condición.
+     *
+     * @param  Closure(Builder<Venta>): mixed  $condicion
+     * @param  array<string, mixed>  $cambios
+     */
+    private function actualizarSi(Closure $condicion, array $cambios): bool
+    {
+        $consulta = Venta::query()->whereKey($this->getKey());
+        $condicion($consulta);
+
+        $actualizada = $consulta->update($cambios) === 1;
 
         if ($actualizada) {
             $this->refresh();

@@ -78,8 +78,9 @@
      * (paleta de categorías: el orden importa, no reordenar sin revalidar).
      */
     --grafica-facturada: #0f9f6e;
-    --grafica-pendiente: #eda100;
-    --grafica-devuelta: #d03b3b;
+    --grafica-pendiente: #e34948;
+    --grafica-con-serie: #eda100;
+    --grafica-devuelta: #4a3aa7;
     --convenio-1: #4a3aa7;
     --convenio-2: #eb6834;
     --convenio-3: #1baf7a;
@@ -129,8 +130,9 @@
     --marca-naranja: #ff6a33;
 
     --grafica-facturada: #1baf7a;
-    --grafica-pendiente: #c98500;
-    --grafica-devuelta: #d03b3b;
+    --grafica-pendiente: #e66767;
+    --grafica-con-serie: #c98500;
+    --grafica-devuelta: #9085e9;
     --convenio-1: #9085e9;
     --convenio-2: #d95926;
     --convenio-3: #199e70;

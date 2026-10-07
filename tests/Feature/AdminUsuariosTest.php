@@ -36,7 +36,7 @@ test('admins see every user with its sales count', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('admin/usuarios')
             ->has('usuarios', 2)
-            ->has('roles', 4),
+            ->has('roles', 5),
         );
 });
 

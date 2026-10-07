@@ -44,10 +44,10 @@ export default function CorregirVenta({ convenios, venta }: Props) {
                 </div>
 
                 {venta.motivo_devolucion && (
-                    <Alert className="border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100">
+                    <Alert className="border-purple-300 bg-purple-50 text-purple-900 dark:border-purple-900 dark:bg-purple-950 dark:text-purple-100">
                         <TriangleAlert />
                         <AlertTitle>Motivo de la devolución</AlertTitle>
-                        <AlertDescription className="whitespace-pre-line text-red-900 dark:text-red-100">
+                        <AlertDescription className="whitespace-pre-line text-purple-900 dark:text-purple-100">
                             {venta.motivo_devolucion}
                         </AlertDescription>
                     </Alert>

@@ -52,8 +52,8 @@ export default function RegistrarVenta({
                 )}
 
                 {porCorregir.length > 0 && (
-                    <section className="flex flex-col gap-3 rounded-xl border border-red-300 bg-red-50/60 p-4 dark:border-red-900 dark:bg-red-950/30">
-                        <h2 className="flex items-center gap-2 font-semibold text-red-800 dark:text-red-200">
+                    <section className="flex flex-col gap-3 rounded-xl border border-purple-300 bg-purple-50/60 p-4 dark:border-purple-900 dark:bg-purple-950/30">
+                        <h2 className="flex items-center gap-2 font-semibold text-purple-800 dark:text-purple-200">
                             <TriangleAlert className="size-5" />
                             Devueltas por corregir ({porCorregir.length})
                         </h2>
@@ -114,6 +114,11 @@ function TarjetaVenta({
     venta: VentaReciente;
     onMarcarCaida: (venta: VentaReciente) => void;
 }) {
+    const devueltaABodega =
+        venta.estado === 'devuelta' && venta.devuelta_a === 'bodega';
+    const porCorregir =
+        venta.estado === 'devuelta' && venta.devuelta_a !== 'bodega';
+
     return (
         <li className="rounded-xl border bg-card p-4 text-sm shadow-xs">
             <div className="flex items-start justify-between gap-2">
@@ -123,9 +128,16 @@ function TarjetaVenta({
                 </div>
                 <div className="flex flex-col items-end gap-1">
                     <EstadoVentaBadge estado={venta.estado} />
-                    {venta.corregida && venta.estado === 'pendiente' && (
+                    {venta.corregida &&
+                        (venta.estado === 'pendiente' ||
+                            venta.estado === 'con_serie') && (
+                            <span className="text-xs text-muted-foreground">
+                                Corregida
+                            </span>
+                        )}
+                    {devueltaABodega && (
                         <span className="text-xs text-muted-foreground">
-                            Corregida
+                            La está corrigiendo bodega
                         </span>
                     )}
                 </div>
@@ -143,7 +155,7 @@ function TarjetaVenta({
             )}
 
             {venta.estado === 'devuelta' && venta.motivo_devolucion && (
-                <p className="mt-2 rounded-md bg-red-50 p-2 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <p className="mt-2 rounded-md bg-purple-50 p-2 text-purple-900 dark:bg-purple-950 dark:text-purple-100">
                     <span className="font-medium">Motivo de devolución:</span>{' '}
                     {venta.motivo_devolucion}
                 </p>
@@ -156,7 +168,7 @@ function TarjetaVenta({
                 </p>
             )}
 
-            {(venta.estado === 'devuelta' || venta.puede_marcar_caida) && (
+            {(porCorregir || venta.puede_marcar_caida) && (
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                     {venta.puede_marcar_caida && (
                         <Button
@@ -167,7 +179,7 @@ function TarjetaVenta({
                             MARCAR COMO CAÍDA
                         </Button>
                     )}
-                    {venta.estado === 'devuelta' && (
+                    {porCorregir && (
                         <Button size="sm" asChild>
                             <Link href={edit(venta.id)}>CORREGIR</Link>
                         </Button>

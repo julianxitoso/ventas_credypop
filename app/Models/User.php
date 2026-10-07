@@ -75,6 +75,11 @@ class User extends Authenticatable
         return $this->rol === Rol::Asesor;
     }
 
+    public function esBodega(): bool
+    {
+        return $this->rol === Rol::Bodega;
+    }
+
     public function puedeFacturar(): bool
     {
         return $this->rol === Rol::Facturador;
@@ -102,6 +107,7 @@ class User extends Authenticatable
     {
         return match (true) {
             $this->esAsesor() => route('ventas.create'),
+            $this->esBodega() => route('bodega'),
             $this->puedeVerDashboard() => route('resumen'),
             default => route('panel'),
         };

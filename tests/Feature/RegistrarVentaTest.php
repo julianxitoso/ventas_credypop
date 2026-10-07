@@ -34,14 +34,24 @@ test('asesores register a pending sale in their own name', function () {
         ->and($venta->convenios->first()->pivot->gasto_administrativo)->toBeNull();
 });
 
+test('asesores can not set serials: only bodega assigns them', function () {
+    $this->actingAs($this->asesor)->post(route('ventas.store'), datosDeVenta([
+        'productos' => [
+            ['articulo' => 'Televisor', 'marca' => 'Samsung', 'referencia' => 'UN55', 'serial' => 'SN-0001', 'valor' => '1250000'],
+        ],
+    ]))->assertSessionHasNoErrors();
+
+    expect(Venta::sole()->productos->sole()->serial)->toBeNull();
+});
+
 test('a sale has several products and its total is their sum', function () {
     $brilla = Convenio::factory()->create(['nombre' => 'Brilla']);
     $addi = Convenio::factory()->create(['nombre' => 'Addi']);
 
     $this->actingAs($this->asesor)->post(route('ventas.store'), datosDeVenta([
         'productos' => [
-            ['articulo' => 'Televisor', 'marca' => 'Samsung', 'referencia' => 'UN55', 'serial' => '', 'valor' => '$1.000.000'],
-            ['articulo' => 'Nevera', 'marca' => 'LG', 'referencia' => 'GT32', 'serial' => '', 'valor' => '$800.000'],
+            ['articulo' => 'Televisor', 'marca' => 'Samsung', 'referencia' => 'UN55', 'valor' => '$1.000.000'],
+            ['articulo' => 'Nevera', 'marca' => 'LG', 'referencia' => 'GT32', 'valor' => '$800.000'],
         ],
         'valor_inicial' => '$300.000',
         'forma_pago_inicial' => 'efectivo',
@@ -190,8 +200,8 @@ test('the sale is rejected when the data is invalid', function (array $cambios, 
 })->with([
     'inicial mayor que el total' => [['valor_inicial' => '1250001', 'forma_pago_inicial' => 'efectivo'], 'valor_inicial'],
     'sin productos' => [['productos' => []], 'productos'],
-    'producto sin artículo' => [['productos' => [['articulo' => '', 'marca' => 'LG', 'referencia' => 'X', 'serial' => '', 'valor' => '100']]], 'productos.0.articulo'],
-    'producto en cero' => [['productos' => [['articulo' => 'TV', 'marca' => 'LG', 'referencia' => 'X', 'serial' => '', 'valor' => '0']]], 'productos.0.valor'],
+    'producto sin artículo' => [['productos' => [['articulo' => '', 'marca' => 'LG', 'referencia' => 'X', 'valor' => '100']]], 'productos.0.articulo'],
+    'producto en cero' => [['productos' => [['articulo' => 'TV', 'marca' => 'LG', 'referencia' => 'X', 'valor' => '0']]], 'productos.0.valor'],
     'sin convenios' => [['convenios' => []], 'convenios'],
     'convenio inactivo' => [fn () => ['convenios' => [convenioDeVenta(Convenio::factory()->inactivo()->create(), '1250000')]], 'convenios.0.convenio_id'],
     'celular sin 10 dígitos' => [['cliente_celular' => '300123'], 'cliente_celular'],

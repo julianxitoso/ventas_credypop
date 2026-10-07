@@ -26,15 +26,17 @@ class PanelController extends Controller
         'Producto', 'Artículo', 'Marca', 'Referencia', 'Serial', 'Valor producto',
         'Total venta', 'Valor inicial', 'Pago inicial', 'Número transferencia',
         'Convenios', 'Gasto administrativo', 'Observaciones',
-        'Estado', 'Número factura', 'Facturada en', 'Facturada por',
-        'Motivo devolución', 'Devuelta en', 'Devuelta por', 'Corregida en',
+        'Estado', 'Series asignadas en', 'Series asignadas por',
+        'Número factura', 'Facturada en', 'Facturada por',
+        'Motivo devolución', 'Devuelta a', 'Error de serie', 'Error de otros datos',
+        'Devuelta en', 'Devuelta por', 'Corregida en',
         'Motivo caída', 'Caída en',
     ];
 
     /**
      * Panel del facturador y del administrador: indicadores y listado de ventas.
      * La página se actualiza sola cada 30 segundos; "ultimaVentaId" y
-     * "ultimaCorreccion" le permiten avisar cuando llega trabajo nuevo.
+     * "ultimaListaParaFacturar" le permiten avisar cuando llega trabajo nuevo.
      */
     public function index(Request $request): Response
     {
@@ -48,7 +50,7 @@ class PanelController extends Controller
             ),
             'puedeFacturar' => $request->user()->can('facturar'),
             'ultimaVentaId' => (int) Venta::query()->max('id'),
-            'ultimaCorreccion' => Venta::query()->max('corregida_en'),
+            'ultimaListaParaFacturar' => Venta::query()->max('con_serie_en'),
         ]);
     }
 
@@ -99,16 +101,21 @@ class PanelController extends Controller
     }
 
     /**
+     * En "pendientes" aparecen las ventas sin serie (solo consulta) y con serie
+     * (para facturar); estas últimas van primero.
+     *
      * @param  array{pestana: string, buscar: string, estado: string}  $filtros
      * @return Builder<Venta>
      */
     private function consulta(array $filtros): Builder
     {
         return Venta::query()
-            ->with(['asesor:id,name,usuario', 'productos', 'conveniosVenta.convenio:id,nombre', 'facturador:id,name', 'devueltaPor:id,name'])
+            ->with(['asesor:id,name,usuario', 'productos', 'conveniosVenta.convenio:id,nombre', 'facturador:id,name', 'devueltaPor:id,name', 'seriesAsignadasPor:id,name'])
             ->when(
                 $filtros['pestana'] === 'pendientes',
-                fn (Builder $query) => $query->where('estado', EstadoVenta::Pendiente),
+                fn (Builder $query) => $query
+                    ->whereIn('estado', EstadoVenta::porFacturar())
+                    ->orderByRaw('case when estado = ? then 0 else 1 end', [EstadoVenta::ConSerie->value]),
                 fn (Builder $query) => $query->when(
                     $filtros['estado'] !== '',
                     fn (Builder $query) => $query->where('estado', $filtros['estado']),
@@ -119,17 +126,16 @@ class PanelController extends Controller
     }
 
     /**
-     * @return array{pendientes: int, facturadasHoy: int, devueltasHoy: int, valorPendiente: int}
+     * @return array{conSerie: int, sinSerie: int, facturadasHoy: int, devueltasHoy: int, valorPendiente: int}
      */
     private function indicadores(): array
     {
-        $pendientes = Venta::query()->where('estado', EstadoVenta::Pendiente);
-
         return [
-            'pendientes' => (clone $pendientes)->count(),
+            'conSerie' => Venta::query()->where('estado', EstadoVenta::ConSerie)->count(),
+            'sinSerie' => Venta::query()->where('estado', EstadoVenta::Pendiente)->count(),
             'facturadasHoy' => Venta::query()->where('facturada_en', '>=', today())->count(),
             'devueltasHoy' => Venta::query()->where('devuelta_en', '>=', today())->count(),
-            'valorPendiente' => (int) $pendientes->sum('valor_venta'),
+            'valorPendiente' => (int) Venta::query()->whereIn('estado', EstadoVenta::porFacturar())->sum('valor_venta'),
         ];
     }
 
@@ -173,10 +179,15 @@ class PanelController extends Controller
             $gasto > 0 ? $gasto : null,
             $venta->observaciones,
             $venta->estado->etiqueta(),
+            $venta->series_asignadas_en?->format('Y-m-d H:i'),
+            $venta->seriesAsignadasPor?->name,
             $venta->numero_factura,
             $venta->facturada_en?->format('Y-m-d H:i'),
             $venta->facturador?->name,
             $venta->motivo_devolucion,
+            $venta->devuelta_a?->etiqueta(),
+            $venta->devuelta_en !== null ? ($venta->devolucion_por_serie ? 'Sí' : 'No') : null,
+            $venta->devuelta_en !== null ? ($venta->devolucion_por_otros ? 'Sí' : 'No') : null,
             $venta->devuelta_en?->format('Y-m-d H:i'),
             $venta->devueltaPor?->name,
             $venta->corregida_en?->format('Y-m-d H:i'),

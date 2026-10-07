@@ -20,11 +20,16 @@ import { formatearPesos } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import type { Convenio } from '@/types';
 
+/**
+ * La serie la asigna bodega: aquí solo se muestra. El id identifica los
+ * productos ya guardados al corregir, para conservar su serie.
+ */
 export type ProductoFormulario = {
+    id?: number;
     articulo: string;
     marca: string;
     referencia: string;
-    serial: string;
+    serial?: string | null;
     valor: string;
 };
 
@@ -55,7 +60,6 @@ const productoVacio: ProductoFormulario = {
     articulo: '',
     marca: '',
     referencia: '',
-    serial: '',
     valor: '',
 };
 
@@ -316,25 +320,6 @@ export default function FormularioVenta({
                                     />
                                 </Campo>
                                 <Campo
-                                    id={id('serial')}
-                                    etiqueta="Serie (opcional)"
-                                    error={errores[id('serial')]}
-                                >
-                                    <Input
-                                        id={id('serial')}
-                                        maxLength={100}
-                                        value={producto.serial}
-                                        onChange={(e) =>
-                                            actualizarProducto(i, {
-                                                serial: e.target.value,
-                                            })
-                                        }
-                                        aria-invalid={Boolean(
-                                            errores[id('serial')],
-                                        )}
-                                    />
-                                </Campo>
-                                <Campo
                                     id={id('valor')}
                                     etiqueta="Valor"
                                     error={errores[id('valor')]}
@@ -353,6 +338,14 @@ export default function FormularioVenta({
                                     />
                                 </Campo>
                             </div>
+                            {producto.serial && (
+                                <p className="text-sm text-muted-foreground">
+                                    Serie asignada por bodega:{' '}
+                                    <span className="font-medium text-foreground">
+                                        {producto.serial}
+                                    </span>
+                                </p>
+                            )}
                         </div>
                     );
                 })}

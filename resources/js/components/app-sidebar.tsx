@@ -5,6 +5,7 @@ import {
     Handshake,
     LayoutGrid,
     Users,
+    Warehouse,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -18,7 +19,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { panel, resumen } from '@/routes';
+import { bodega, panel, resumen } from '@/routes';
 import { index as convenios } from '@/routes/admin/convenios';
 import { index as usuarios } from '@/routes/admin/usuarios';
 import { create } from '@/routes/ventas';
@@ -34,6 +35,9 @@ export function AppSidebar() {
             : []),
         ...(permisos?.registrarVentas
             ? [{ title: 'Registrar venta', href: create(), icon: FilePlus }]
+            : []),
+        ...(permisos?.asignarSeries
+            ? [{ title: 'Bodega', href: bodega(), icon: Warehouse }]
             : []),
         ...(permisos?.verVentas
             ? [{ title: 'Panel de ventas', href: panel(), icon: ClipboardList }]

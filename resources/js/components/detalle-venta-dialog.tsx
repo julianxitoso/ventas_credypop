@@ -1,37 +1,29 @@
-import { useForm } from '@inertiajs/react';
-import { useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import EstadoVentaBadge from '@/components/estado-venta-badge';
-import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
 import { formatearPesos } from '@/lib/formato';
-import { devolver, facturar } from '@/routes/ventas';
 import type { VentaPanel } from '@/types';
 
 type Props = {
     venta: VentaPanel | null;
-    puedeFacturar: boolean;
     onClose: () => void;
+    /** Acciones de la parte inferior (facturar, asignar series…), si las hay. */
+    acciones?: (venta: VentaPanel, onClose: () => void) => ReactNode;
 };
 
 /**
- * Detalle de una venta con las acciones de facturar y devolver.
+ * Detalle de una venta. Las acciones las pone cada pantalla (panel o bodega).
  */
 export default function DetalleVentaDialog({
     venta,
-    puedeFacturar,
     onClose,
+    acciones,
 }: Props) {
     return (
         <Dialog
@@ -39,14 +31,13 @@ export default function DetalleVentaDialog({
             onOpenChange={(open) => !open && onClose()}
         >
             {/* Encabezado y acciones fijos; solo los datos se desplazan, para que
-                FACTURAR y DEVOLVER se vean siempre, aunque la pantalla sea baja. */}
+                los botones se vean siempre, aunque la pantalla sea baja. */}
             <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
                 {venta && (
                     <ContenidoDetalle
                         key={venta.id}
                         venta={venta}
-                        puedeFacturar={puedeFacturar}
-                        onClose={onClose}
+                        acciones={acciones?.(venta, onClose)}
                     />
                 )}
             </DialogContent>
@@ -54,38 +45,15 @@ export default function DetalleVentaDialog({
     );
 }
 
-type Accion = 'detalle' | 'facturar' | 'devolver';
-
 function ContenidoDetalle({
     venta,
-    puedeFacturar,
-    onClose,
+    acciones,
 }: {
     venta: VentaPanel;
-    puedeFacturar: boolean;
-    onClose: () => void;
+    acciones: ReactNode;
 }) {
-    const [accion, setAccion] = useState<Accion>('detalle');
-    const formFactura = useForm({ numero_factura: '' });
-    const formDevolucion = useForm({ motivo_devolucion: '' });
-
-    const puedeProcesar = puedeFacturar && venta.estado === 'pendiente';
-
-    function confirmarFacturacion(event: FormEvent) {
-        event.preventDefault();
-        formFactura.post(facturar(venta.id).url, {
-            preserveScroll: true,
-            onSuccess: onClose,
-        });
-    }
-
-    function confirmarDevolucion(event: FormEvent) {
-        event.preventDefault();
-        formDevolucion.post(devolver(venta.id).url, {
-            preserveScroll: true,
-            onSuccess: onClose,
-        });
-    }
+    const porFacturar =
+        venta.estado === 'pendiente' || venta.estado === 'con_serie';
 
     return (
         <>
@@ -100,7 +68,7 @@ function ContenidoDetalle({
             </DialogHeader>
 
             <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto px-6 py-4 text-sm">
-                {venta.estado === 'pendiente' && venta.corregida_en && (
+                {porFacturar && venta.corregida_en && (
                     <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
                         <p className="font-medium">
                             Corregida por el asesor el {venta.corregida_en}
@@ -186,6 +154,14 @@ function ContenidoDetalle({
                             </tbody>
                         </table>
                     </div>
+                    {venta.series_asignadas_en && (
+                        <p className="text-muted-foreground">
+                            Series asignadas por bodega el{' '}
+                            {venta.series_asignadas_en}
+                            {venta.series_asignadas_por &&
+                                ` · ${venta.series_asignadas_por}`}
+                        </p>
+                    )}
                 </Grupo>
 
                 <Grupo titulo="Cuota inicial y convenios">
@@ -229,10 +205,15 @@ function ContenidoDetalle({
 
                 {venta.estado === 'devuelta' && (
                     <Grupo titulo="Devolución" columnas={1}>
-                        <p className="rounded-md bg-red-50 p-2 whitespace-pre-line text-red-800 dark:bg-red-950 dark:text-red-200">
+                        <p className="rounded-md bg-purple-50 p-2 whitespace-pre-line text-purple-900 dark:bg-purple-950 dark:text-purple-100">
                             {venta.motivo_devolucion}
                         </p>
                         <p className="text-muted-foreground">
+                            {tipoDeError(venta)}
+                            {venta.devuelta_a === 'bodega'
+                                ? 'La corrige bodega'
+                                : 'La corrige el asesor'}
+                            {' · '}
                             {venta.devuelta_en} · {venta.devuelta_por ?? '—'}
                         </p>
                     </Grupo>
@@ -250,144 +231,25 @@ function ContenidoDetalle({
                 )}
             </div>
 
-            {puedeProcesar && (
+            {acciones && (
                 <div className="border-t bg-background px-6 py-4">
-                    {accion === 'detalle' && (
-                        <DialogFooter>
-                            <Button
-                                variant="destructive"
-                                onClick={() => setAccion('devolver')}
-                            >
-                                DEVOLVER / CORREGIR
-                            </Button>
-                            <Button
-                                className="bg-green-600 text-white hover:bg-green-700"
-                                onClick={() => setAccion('facturar')}
-                            >
-                                FACTURAR
-                            </Button>
-                        </DialogFooter>
-                    )}
-
-                    {accion === 'facturar' && (
-                        <form
-                            onSubmit={confirmarFacturacion}
-                            className="grid gap-3"
-                        >
-                            <Label htmlFor="numero_factura">
-                                Número de factura del ERP
-                            </Label>
-                            <Input
-                                id="numero_factura"
-                                autoFocus
-                                required
-                                maxLength={50}
-                                value={formFactura.data.numero_factura}
-                                onChange={(e) =>
-                                    formFactura.setData(
-                                        'numero_factura',
-                                        e.target.value,
-                                    )
-                                }
-                                aria-invalid={Boolean(
-                                    formFactura.errors.numero_factura,
-                                )}
-                            />
-                            <InputError
-                                message={formFactura.errors.numero_factura}
-                            />
-                            <InputError
-                                message={
-                                    (
-                                        formFactura.errors as Record<
-                                            string,
-                                            string
-                                        >
-                                    ).venta
-                                }
-                            />
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setAccion('detalle')}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={formFactura.processing}
-                                    className="bg-green-600 text-white hover:bg-green-700"
-                                >
-                                    {formFactura.processing && <Spinner />}
-                                    CONFIRMAR FACTURACIÓN
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    )}
-
-                    {accion === 'devolver' && (
-                        <form
-                            onSubmit={confirmarDevolucion}
-                            className="grid gap-3"
-                        >
-                            <Label htmlFor="motivo_devolucion">
-                                Motivo de la devolución
-                            </Label>
-                            <textarea
-                                id="motivo_devolucion"
-                                autoFocus
-                                required
-                                rows={3}
-                                maxLength={1000}
-                                value={formDevolucion.data.motivo_devolucion}
-                                onChange={(e) =>
-                                    formDevolucion.setData(
-                                        'motivo_devolucion',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="Ej. El serial no coincide con la factura del proveedor"
-                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
-                            />
-                            <InputError
-                                message={
-                                    formDevolucion.errors.motivo_devolucion
-                                }
-                            />
-                            <InputError
-                                message={
-                                    (
-                                        formDevolucion.errors as Record<
-                                            string,
-                                            string
-                                        >
-                                    ).venta
-                                }
-                            />
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setAccion('detalle')}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    variant="destructive"
-                                    disabled={formDevolucion.processing}
-                                >
-                                    {formDevolucion.processing && <Spinner />}
-                                    CONFIRMAR DEVOLUCIÓN
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    )}
+                    {acciones}
                 </div>
             )}
         </>
     );
+}
+
+/**
+ * "Error en la serie · ", "Error en otros datos · " o ambos.
+ */
+function tipoDeError(venta: VentaPanel): string {
+    const errores = [
+        venta.devolucion_por_serie && 'la serie',
+        venta.devolucion_por_otros && 'otros datos',
+    ].filter(Boolean);
+
+    return errores.length > 0 ? `Error en ${errores.join(' y ')} · ` : '';
 }
 
 function Grupo({

@@ -35,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
     protected function configurePermisos(): void
     {
         Gate::define('registrar-ventas', fn (User $user): bool => $user->esAsesor());
+        Gate::define('asignar-series', fn (User $user): bool => $user->esBodega());
         Gate::define('ver-ventas', fn (User $user): bool => $user->puedeVerTodo());
         Gate::define('facturar', fn (User $user): bool => $user->puedeFacturar());
         Gate::define('ver-dashboard', fn (User $user): bool => $user->puedeVerDashboard());

@@ -1,4 +1,12 @@
-export type EstadoVenta = 'pendiente' | 'facturada' | 'devuelta' | 'caida';
+export type EstadoVenta =
+    | 'pendiente'
+    | 'con_serie'
+    | 'facturada'
+    | 'devuelta'
+    | 'caida';
+
+/** Quién debe corregir una venta devuelta. */
+export type ResponsableDevolucion = 'asesor' | 'bodega';
 
 export type Convenio = {
     id: number;
@@ -52,9 +60,16 @@ export type VentaPanel = {
     numero_factura: string | null;
     facturada_en: string | null;
     facturada_por: string | null;
+    series_asignadas_en: string | null;
+    series_asignadas_por: string | null;
     motivo_devolucion: string | null;
     devuelta_en: string | null;
     devuelta_por: string | null;
+    devuelta_a: ResponsableDevolucion | null;
+    devolucion_por_serie: boolean;
+    devolucion_por_otros: boolean;
+    /** Bodega debe revisar las series cuando el asesor corrija. */
+    revisar_serie: boolean;
     corregida_en: string | null;
     motivo_caida: string | null;
     caida_en: string | null;
@@ -69,7 +84,10 @@ export type FiltrosPanel = {
 };
 
 export type IndicadoresPanel = {
-    pendientes: number;
+    /** Listas para facturar. */
+    conSerie: number;
+    /** Esperando que bodega asigne la serie. */
+    sinSerie: number;
     facturadasHoy: number;
     devueltasHoy: number;
     valorPendiente: number;
@@ -100,6 +118,7 @@ export type VentaReciente = {
     estado: EstadoVenta;
     numero_factura: string | null;
     motivo_devolucion: string | null;
+    devuelta_a: ResponsableDevolucion | null;
     motivo_caida: string | null;
     corregida: boolean;
     puede_marcar_caida: boolean;

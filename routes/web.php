@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\ConvenioController;
 use App\Http\Controllers\Admin\UsuarioController;
+use App\Http\Controllers\BodegaController;
 use App\Http\Controllers\FacturacionController;
 use App\Http\Controllers\PanelController;
 use App\Http\Controllers\ResumenController;
@@ -21,6 +22,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('ventas/{venta}/corregir', [VentaController::class, 'edit'])->name('ventas.edit');
         Route::put('ventas/{venta}', [VentaController::class, 'update'])->name('ventas.update');
         Route::post('ventas/{venta}/caida', [VentaController::class, 'marcarCaida'])->name('ventas.caida');
+    });
+
+    Route::middleware('can:asignar-series')->group(function () {
+        Route::get('bodega', [BodegaController::class, 'index'])->name('bodega');
+        Route::post('bodega/ventas/{venta}/series', [BodegaController::class, 'asignarSeries'])->name('bodega.series');
+        Route::post('bodega/ventas/{venta}/devolver', [BodegaController::class, 'devolver'])->name('bodega.devolver');
     });
 
     Route::middleware('can:ver-ventas')->group(function () {

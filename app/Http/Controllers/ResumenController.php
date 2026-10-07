@@ -96,7 +96,9 @@ class ResumenController extends Controller
         $dato = fn (EstadoVenta $estado, string $campo): int => (int) ($porEstado->get($estado->value)->{$campo} ?? 0);
 
         $valorVendido = $dato(EstadoVenta::Facturada, 'valor');
-        $porFacturar = $dato(EstadoVenta::Pendiente, 'valor') + $dato(EstadoVenta::Devuelta, 'valor');
+        $porFacturar = $dato(EstadoVenta::Pendiente, 'valor')
+            + $dato(EstadoVenta::ConSerie, 'valor')
+            + $dato(EstadoVenta::Devuelta, 'valor');
 
         return [
             'valorVendido' => $valorVendido,
@@ -106,7 +108,7 @@ class ResumenController extends Controller
             'ventasConInicial' => (int) $porEstado->sum('con_inicial') - $dato(EstadoVenta::Caida, 'con_inicial'),
             'valorSinIniciales' => $valorVendido - $dato(EstadoVenta::Facturada, 'inicial'),
             'facturadas' => $dato(EstadoVenta::Facturada, 'cantidad'),
-            'pendientes' => $dato(EstadoVenta::Pendiente, 'cantidad'),
+            'pendientes' => $dato(EstadoVenta::Pendiente, 'cantidad') + $dato(EstadoVenta::ConSerie, 'cantidad'),
             'devueltas' => $dato(EstadoVenta::Devuelta, 'cantidad'),
             'caidas' => $dato(EstadoVenta::Caida, 'cantidad'),
         ];
@@ -116,7 +118,7 @@ class ResumenController extends Controller
      * Ventas (sin caídas) de cada día del período, separadas por estado,
      * incluidos los días en cero.
      *
-     * @return list<array{dia: string, etiqueta: string, cantidad: int, valor: int, facturadas: int, pendientes: int, devueltas: int}>
+     * @return list<array{dia: string, etiqueta: string, cantidad: int, valor: int, facturadas: int, pendientes: int, conSerie: int, devueltas: int}>
      */
     private function porDia(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
@@ -125,6 +127,7 @@ class ResumenController extends Controller
             ->selectRaw('date(created_at) as dia, count(*) as cantidad, sum(valor_venta) as valor')
             ->selectRaw('sum(case when estado = ? then 1 else 0 end) as facturadas', [EstadoVenta::Facturada->value])
             ->selectRaw('sum(case when estado = ? then 1 else 0 end) as pendientes', [EstadoVenta::Pendiente->value])
+            ->selectRaw('sum(case when estado = ? then 1 else 0 end) as con_serie', [EstadoVenta::ConSerie->value])
             ->selectRaw('sum(case when estado = ? then 1 else 0 end) as devueltas', [EstadoVenta::Devuelta->value])
             ->groupByRaw('date(created_at)')
             ->get()
@@ -143,6 +146,7 @@ class ResumenController extends Controller
                 'valor' => (int) ($total->valor ?? 0),
                 'facturadas' => (int) ($total->facturadas ?? 0),
                 'pendientes' => (int) ($total->pendientes ?? 0),
+                'conSerie' => (int) ($total->con_serie ?? 0),
                 'devueltas' => (int) ($total->devueltas ?? 0),
             ];
         }
@@ -163,7 +167,7 @@ class ResumenController extends Controller
             ->select('users.id', 'users.name', 'users.usuario')
             ->selectRaw('count(*) as ventas')
             ->selectRaw('sum(case when ventas.estado = ? then ventas.valor_venta else 0 end) as valor', [EstadoVenta::Facturada->value])
-            ->selectRaw('sum(case when ventas.estado in (?, ?) then ventas.valor_venta else 0 end) as por_facturar', [EstadoVenta::Pendiente->value, EstadoVenta::Devuelta->value])
+            ->selectRaw('sum(case when ventas.estado in (?, ?, ?) then ventas.valor_venta else 0 end) as por_facturar', [EstadoVenta::Pendiente->value, EstadoVenta::ConSerie->value, EstadoVenta::Devuelta->value])
             ->selectRaw('sum(case when ventas.estado != ? then ventas.valor_inicial else 0 end) as inicial', [EstadoVenta::Caida->value])
             ->selectRaw('sum(case when ventas.estado = ? then 1 else 0 end) as facturadas', [EstadoVenta::Facturada->value])
             ->selectRaw('sum(case when ventas.estado = ? then 1 else 0 end) as devueltas', [EstadoVenta::Devuelta->value])

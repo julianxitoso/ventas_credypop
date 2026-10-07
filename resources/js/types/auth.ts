@@ -13,6 +13,7 @@ export type User = {
 
 export type Permisos = {
     registrarVentas: boolean;
+    asignarSeries: boolean;
     verVentas: boolean;
     facturar: boolean;
     verDashboard: boolean;

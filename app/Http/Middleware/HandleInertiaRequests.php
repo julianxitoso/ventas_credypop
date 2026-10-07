@@ -44,6 +44,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user,
                 'permisos' => $user ? [
                     'registrarVentas' => $user->can('registrar-ventas'),
+                    'asignarSeries' => $user->can('asignar-series'),
                     'verVentas' => $user->can('ver-ventas'),
                     'facturar' => $user->can('facturar'),
                     'verDashboard' => $user->can('ver-dashboard'),
